@@ -161,7 +161,7 @@ impl Player {
     }
 
     pub async fn get_stream<'a>(&'a self, iface: &str) -> Result<SignalStream<'static>, zbus::Error> {
-        let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", iface.to_owned()).await?;
+        let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2/Player", iface.to_owned()).await?;
 
         proxy.receive_all_signals().await
     }
@@ -328,8 +328,8 @@ impl Player {
     /// Returns how much time has passed since the start of the track.
     /// <br>You shouldnt use this, but TODO: UNIMPLEMENTED to track the position, as using this means actively polling the value.
     pub async fn get_position(&self) -> Duration {
-        match self.get_prop("Rate", "org.mpris.MediaPlayer2.Player").await.unwrap_or(None) {
-            Some(status) => if let Ok(v) = status.downcast_ref::<u64>() {Duration::from_micros(v)} else {Duration::from_secs(0)},
+        match self.get_prop("Position", "org.mpris.MediaPlayer2.Player").await.unwrap_or(None) {
+            Some(status) => if let Ok(v) = status.downcast_ref::<i64>() {Duration::from_micros(v as u64)} else {Duration::from_secs(0)},
             None => Duration::from_secs(0)
         }
     }
