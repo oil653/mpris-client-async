@@ -1,32 +1,35 @@
-use futures::{StreamExt, stream};
-use mpris_client_async::Mpris;
+use std::time::Duration;
+
+use mpris_client_async::{Mpris, properties::*};
 
 #[tokio::main]
 async fn main() {
-    let mpris = Mpris::new().await.unwrap();
+    let mpris: Mpris = Mpris::new().await.unwrap();
     let players = mpris.get_players().await.unwrap();
     
-    let mut streams = Vec::new();
+    // let mut streams = Vec::new();
 
     // Get the "unique name" of the players
     for player in players {
         println!("Player: {}, with identity {} with desktop entry {}", 
             player.dbus_name(),
-            player.get_identity().await.unwrap_or("??".to_string()), 
-            player.get_desktop_entry().await.unwrap_or("??".to_string())
+            player.get(Identity).await.unwrap_or("??".to_string()),
+            player.get(DesktopEntry).await.unwrap_or("??".to_string())
         );
+
+        // println!("Player identity: {}", player.get::<properties::Identity>().await.unwrap_or("Freak"));
 
         println!("\tMediaPlayer2:");
         println!("\t\tCapabilities:");
-        println!("\t\t\tcan quit? {}", player.can_quit().await);
-        println!("\t\t\tcan set fullscreen? {}", player.can_set_fullscreen().await);
-        println!("\t\t\tcan raise? {}", player.can_raise().await);
-        println!("\t\t\thas track list? {}", player.has_track_list().await);
-        println!("\t\t\tsupported URI: {:?}", player.supported_uri().await);
-        println!("\t\t\tsupported MIME types: {:?}", player.supported_uri().await);
+        println!("\t\t\tcan quit? {}",                  player.get(CanQuit).await.unwrap_or(false));
+        println!("\t\t\tcan set fullscreen? {}",        player.get(CanSetFullscreen).await.unwrap_or(false));
+        println!("\t\t\tcan raise? {}",                 player.get(CanRaise).await.unwrap_or(false));
+        println!("\t\t\thas track list? {}",            player.get(HasTrackList).await.unwrap_or(false));
+        println!("\t\t\tsupported URI: {:?}",           player.get(SupportedURIs).await.unwrap_or(vec![]));
+        println!("\t\t\tsupported MIME types: {:?}",    player.get(SupportedMIMEs).await.unwrap_or(vec![]));
 
-        // if player.can_quit().await {
-        //     _ = player.quit().await;
+        // if player.get(CanQuit).await.unwrap_or(false) {
+            
         // }
 
         // if player.can_raise().await {
@@ -34,25 +37,27 @@ async fn main() {
         // }
 
         println!("\tMediaPlayer2.Player:");
-        println!("\t\tPlaybackStatus: {}", player.get_playback_status().await);
-        println!("\t\tLoopStatus: {}", player.get_loop_status().await);
-        println!("\t\trate: {}", player.get_rate().await);
-        println!("\t\tmax rate: {:?} min rate: {:?}", player.get_max_rate().await, player.get_min_rate().await);
-        println!("\t\tis shuffled: {}", player.get_shuffle().await);
-        println!("\t\tvolume: {:?}", player.get_volume().await);
-        println!("\t\tPosition (in secs): {}", player.get_position().await.as_secs());
-        println!("\t\tcan_seek: {}", player.can_seek().await);
-        println!("\t\tcan_control: {}", player.can_control().await);
+        println!("\t\tPlaybackStatus: {}",              player.get(PlaybackStatus).await.unwrap_or(mpris_client_async::Playback::Stopped));
+        println!("\t\tLoopStatus: {}",                  player.get(LoopStatus).await.unwrap_or(mpris_client_async::Loop::None));
+        println!("\t\trate: {}",                        player.get(Rate).await.unwrap_or(1.0));
+        println!("\t\tmax rate: {:?}, min rate: {:?}",  player.get(MinimumRate).await, player.get(MaximumRate).await);
+        println!("\t\tis shuffled: {}",                 player.get(Shuffle).await.unwrap_or(false));
+        println!("\t\tvolume: {}",                      player.get(Volume).await.unwrap_or(0.0));
+        println!("\t\tPosition (in secs): {}",          player.get(Position).await.unwrap_or(Duration::from_secs(0)).as_secs());
+        println!("\t\tcan_seek: {}",                    player.get(CanSeek).await.unwrap_or(false));
+        println!("\t\tcan_control: {}",                 player.get(CanControl).await.unwrap_or(false));
 
-        // println!("\t\t\tMetadata: {:#?}", player.get_metadata().await);
+        println!("\t\t\tMetadata: {:#?}", player.get(Metadata).await);
 
+        // Subscribe to the event when Metadata changed.
+        // streams.push(player.property_changed::<HashMap<String, OwnedValue>>("org.mpris.MediaPlayer2.Player", "Metadata").await.unwrap());
 
-        streams.push(player.get_stream("org.mpris.MediaPlayer2").await.unwrap());
-
-        println!("");
+        println!();
     }
     
-    // while let Some(msg) = streams[0].next().await {
-    //     println!("{:?}", msg);
+    // let mut combined = select_all(streams);
+    // while let Some(msg) = combined.next().await {
+    //     let metadata: Metadata = msg.get().await.unwrap().into();
+    //     println!("{:#?}", metadata);
     // }
 }

@@ -524,6 +524,7 @@ name = "mpris-client-async"
 version = "0.1.0"
 dependencies = [
  "async-lock",
+ "async-trait",
  "futures",
  "serde",
  "tokio",
