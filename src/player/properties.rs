@@ -63,7 +63,8 @@ pub trait Property {
 /// Implementators of this are writable properties
 pub trait WritableProperty : Property {}
 
-/// A property that can be written, but only if CanWrite is enabled
+/// A property that can be modified, but only if CanWrite is true. A property should not implement both this and [WritableProperty] at the same time
+/// <br>According to the specs, this describes the player's implementation, rather than the current state, that might change.
 pub trait ControlWriteProperty : Property {}
 
 /// If false, calling Quit will have no effect. 

@@ -4,7 +4,7 @@ use futures::future::join_all;
 
 use zbus::Connection;
 
-use crate::Player;
+use crate::NormalPlayer;
 
 #[derive(Debug, Clone)]
 pub struct Mpris {
@@ -22,7 +22,7 @@ impl Mpris {
         )
     }
 
-    pub async fn get_players(&self) -> Result<Vec<Arc<Player>>, zbus::Error> {
+    pub async fn get_players(&self) -> Result<Vec<Arc<NormalPlayer>>, zbus::Error> {
         let proxy = zbus::fdo::DBusProxy::new(&self.connection).await?;
         let names = proxy.list_names().await?;
 
@@ -30,7 +30,7 @@ impl Mpris {
             join_all(names   
                 .iter()
                 .filter(|name| name.starts_with("org.mpris.MediaPlayer2"))
-                .map (async |name| Arc::new(Player::new(name.clone(), self.connection.clone()).await))
+                .map (async |name| Arc::new(NormalPlayer::new(name.clone(), self.connection.clone()).await))
             ).await
         )
     }
