@@ -1,108 +1,14 @@
-use std::fmt;
-
 use zbus::{Connection, Proxy, fdo, names::OwnedBusName, zvariant::{OwnedValue, Value}};
 
 mod metadata;
 pub use metadata::Metadata;
 
-use crate::{player::properties::Property, properties::WritableProperty};
+use crate::player::properties::{WritableProperty, Property, ControlWriteProperty};
 
 pub mod properties;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub enum Playback {
-    Playing,
-    Paused,
-    #[default]
-    Stopped
-}
-impl Playback{
-    pub fn to_string(&self) -> String {
-        match *self {
-            Playback::Paused => "Paused",
-            Playback::Playing => "Playing",
-            Playback::Stopped => "Stopped"
-        }.to_string()
-    }
-}
-impl From<String> for Playback {
-    fn from(value: String) -> Self {
-        let value = value.to_lowercase();
-        if value == String::from("playing") {
-            Self::Playing
-        } else if value == String::from("paused") {
-            Self::Paused
-        } else {
-            Self::Stopped
-        }
-    }
-}
-impl From<&str> for Playback {
-    fn from(value: &str) -> Self {
-        let value = value.to_lowercase();
-        if value == String::from("playing") {
-            Self::Playing
-        } else if value == String::from("paused") {
-            Self::Paused
-        } else {
-            Self::Stopped
-        }
-    }
-}
-impl fmt::Display for Playback {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub enum Loop {
-    #[default]
-    /// The playback will stop after the end of the playlist
-    None,
-    /// The current track will repeat forever
-    Track,
-    /// The whole playlist will be repeated
-    Playlist
-}
-impl Loop{
-    pub fn to_string(&self) -> String {
-        match *self {
-            Loop::None => "None",
-            Loop::Track => "Track",
-            Loop::Playlist => "Playlist"
-        }.to_string()
-    }
-}
-impl From<String> for Loop {
-    fn from(value: String) -> Self {
-        let value = value.to_lowercase();
-        if value == String::from("playlist") {
-            Self::Playlist
-        } else if value == String::from("track") {
-            Self::Track
-        } else {
-            Self::None
-        }
-    }
-}
-impl From<&str> for Loop {
-    fn from(value: &str) -> Self {
-        let value = value.to_lowercase();
-        if value == String::from("playlist") {
-            Self::Playlist
-        } else if value == String::from("track") {
-            Self::Track
-        } else {
-            Self::None
-        }
-    }
-}
-impl fmt::Display for Loop {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
-}
+mod enums;
+pub use enums::*;
 
 
 /// Something that plays media.
@@ -161,9 +67,11 @@ impl Player {
 
         proxy.set_property(property.name(), new_value).await.map(|_| ())
     }
+}
 
 
-    // async fn call_method<A, R>(&self, method_name: &str, arguments: A, iface: &str) -> Result<R, zbus::Error> 
+
+// async fn call_method<A, R>(&self, method_name: &str, arguments: A, iface: &str) -> Result<R, zbus::Error> 
     // where 
     //     A: serde::Serialize + zbus::zvariant::DynamicType,
     //     R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
@@ -204,7 +112,6 @@ impl Player {
     // pub async fn raise(&self) -> Result<(), zbus::Error> {
     //     self.call_method("Raise",[()], "org.mpris.MediaPlayer2").await
     // }
-}
 
 
 #[cfg(test)]

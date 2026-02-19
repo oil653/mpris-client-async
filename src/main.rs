@@ -47,7 +47,7 @@ async fn main() {
         println!("\t\tcan_seek: {}",                    player.get(CanSeek).await.unwrap_or(false));
         println!("\t\tcan_control: {}",                 player.get(CanControl).await.unwrap_or(false));
 
-        println!("\t\t\tMetadata: {:#?}", player.get(Metadata).await);
+        println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
 
         // Subscribe to the event when Metadata changed.
         // streams.push(player.property_changed::<HashMap<String, OwnedValue>>("org.mpris.MediaPlayer2.Player", "Metadata").await.unwrap());
