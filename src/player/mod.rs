@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use zbus::{Connection, Proxy, fdo, names::OwnedBusName, zvariant::{OwnedValue, Value}};
 
 mod metadata;
@@ -12,7 +14,7 @@ pub use enums::*;
 
 
 
-/// A player that cannot be [controlled](ControlWritableProperty)
+/// A player that plays something, or not, who knowns...
 #[derive(Debug, Clone)]
 pub struct Player {
     /// Well known name
@@ -35,6 +37,7 @@ impl Player {
         self.name.to_string()
     }
 
+    /// Parses a property from the player. See [properties] for more
     pub async fn get<P>(&self, property: P) -> Result<P::Output, zbus::Error>
     where 
         P: Property,
@@ -53,7 +56,6 @@ impl Player {
     }
 
     /// Set a property that implements [WritableProperty].
-    /// <br>To set something that implements [ControlWritableProperty], check [Self::set_controlled]
     pub async fn set<'a, P>(&self, property: P, new_value: P::Output) -> Result<(), fdo::Error>
     where 
         P: WritableProperty,
@@ -66,7 +68,7 @@ impl Player {
     }
 
 
-    /// Sets a property that requires [properties::CanControl] to be true.
+    /// Sets a property that requires the player to allow controlling, thus [properties::CanControl] must be true. 
     pub async fn set_controlled<'a, P>(&self, property: P, new_value: P::Output) -> Result<(), fdo::Error>
     where 
         P: ControlWritableProperty,
@@ -77,19 +79,93 @@ impl Player {
 
         proxy.set_property(property.name(), transformed_value).await.map(|_| ())
     }
+
+    //                             ====================
+    //                             ===    METHODS   ===
+    //                             ====================
+    async fn call_method<A, R>(&self, method_name: &str, arguments: A, iface: Interface) -> Result<R, zbus::Error> 
+    where 
+        A: serde::Serialize + zbus::zvariant::DynamicType,
+        R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+    {
+        let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", iface.as_str()).await?;
+
+        proxy.call(method_name, &arguments).await
+    }
+
+    
+
+    /// Skips to the next track in the tracklist. If there is no next track (and endless playback and track repeat are both off), stop playback.
+    /// <br>If playback is paused or stopped, it remains that way.
+    /// <br>If [properties::CanGoNext] is false, attempting to call this method should have no effect.
+    pub async fn next(&self) -> Result<(), zbus::Error> {
+        self.call_method("Next", [()], Interface::Player).await
+    }
+
+    /// Skips to the previous track in the tracklist. If there is no previous track (and endless playback and track repeat are both off), stop playback.
+    /// <br>If playback is paused or stopped, it remains that way.
+    /// <br>If [properties::CanGoPrevious] is false, attempting to call this method should have no effect.
+    pub async fn previous(&self) -> Result<(), zbus::Error> {
+        self.call_method("Previous", [()], Interface::Player).await
+    }
+
+    /// Pauses the playback. 
+    /// If [properties::CanPause] is false, this should have no effect.
+    pub async fn pause(&self) -> Result<(), zbus::Error> {
+        self.call_method("Pause", [()], Interface::Player).await
+    }
+
+    /// Starts or resumes the playback. 
+    /// <br>If playback is already running or if [properties::CanPlay] is false, this should have no effect.
+    pub async fn play(&self) -> Result<(), zbus::Error> {
+        self.call_method("Play", [()], Interface::Player).await
+    }
+
+    /// Toggles the playback status between play and pause.
+    /// <br>If [properties::CanPause] is false, this should have no effect, and may return with an error.
+    pub async fn play_pause(&self) -> Result<(), zbus::Error> {
+        self.call_method("PlayPause", [()], Interface::Player).await
+    }
+
+    /// Stops playback. Calling [Self::play] after this should restart the playlist.
+    /// <br>If [properties::CanControl] is false, calling this should have no effect, and may raise an error.
+    pub async fn stop(&self) -> Result<(), zbus::Error> {
+        self.call_method("Stop", [()], Interface::Player).await
+    }
+
+    /// A duration to seek forward, or of backwards is true backwards. 
+    /// <br>May only be used if [properties::CanSeek] is true.
+    pub async fn seek(&self, duration: Duration, backwards: bool) -> Result<(), zbus::Error> {
+        let modified_time = duration.as_micros() as f64 * {if backwards {-1.0} else {1.0}};
+        self.call_method("Seek", [modified_time], Interface::Player).await
+    }
+
+    /// Sets the position of the track between 0 and the [length of the track](metadata::Metadata::length). track_id can be retreived from the [metadata](metadata::Metadata::trackid), but it may <b>NOT<\b> be "/org/mpris/MediaPlayer2/TrackList/NoTrack".
+    /// <br>If position is greater than the [length of the track](metadata::Metadata::length), this shouldn't do anything. 
+    /// <br>If [properties::CanSeek] is false this should have no effect.
+    pub async fn set_position(&self, track_id: String, position: Duration) -> Result<(), zbus::Error> {
+        self.call_method("SetPosition", [track_id, position.as_micros().to_string()], Interface::Player).await
+    }
+
+    /// Opens a URI, which's scheme should be an element of [properties::SupportedURIs] and the mime-type should match one of the elements of [properties::SupportedMIMEs]. 
+    /// If not supported it should raise an error.
+    /// <br>If the playback is stopped, it should be started. It also shouldnt be assumed the player opens the URI as soon as called!
+    pub async fn open_uri(&self, uri: String) -> Result<(), zbus::Error> {
+        self.call_method("OpenUri", [uri], Interface::Player).await
+    }
 }
 
 
 
 // async fn call_method<A, R>(&self, method_name: &str, arguments: A, iface: &str) -> Result<R, zbus::Error> 
-    // where 
-    //     A: serde::Serialize + zbus::zvariant::DynamicType,
-    //     R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
-    // {
-    //     let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", iface.to_owned()).await?;
+// where 
+//     A: serde::Serialize + zbus::zvariant::DynamicType,
+//     R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+// {
+//     let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", iface.to_owned()).await?;
 
-    //     proxy.call(method_name, &arguments).await
-    // }
+//     proxy.call(method_name, &arguments).await
+// }
 
     // /// Returns a stream that fires every time a property of some kind had been changed. 
     // /// <br>If the connection is not active (the MPRIS object is dropped, or for some reason the underlying connection breaks it will yield None)

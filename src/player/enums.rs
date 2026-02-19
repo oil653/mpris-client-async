@@ -1,5 +1,37 @@
 use std::fmt;
 
+/// An dbus, MPRIS interface
+#[derive(Debug, Default)]
+pub enum Interface {
+    #[default]
+    MediaPlayer2,
+    Player,
+    TrackList,
+    Playlists
+}
+impl ToString for Interface {
+    fn to_string(&self) -> String {
+        use Interface::*;
+        match *self {
+            MediaPlayer2 => String::from("org.mpris.MediaPlayer2"),
+            Player => String::from("org.mpris.MediaPlayer2.Player"),
+            TrackList => String::from("org.mpris.MediaPlayer2.TrackList"),
+            Playlists => String::from("org.mpris.MediaPlayer2.Playlists")
+        }
+    }
+}
+impl Interface {
+    pub fn as_str(&self) -> &'static str {
+        use Interface::*;
+        match *self {
+            MediaPlayer2 => "org.mpris.MediaPlayer2",
+            Player => "org.mpris.MediaPlayer2.Player",
+            TrackList => "org.mpris.MediaPlayer2.TrackList",
+            Playlists => "org.mpris.MediaPlayer2.Playlists",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 /// The state of the playback
 pub enum Playback {

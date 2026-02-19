@@ -50,14 +50,17 @@ async fn main() {
         //     let result = player.set_controlled(LoopStatus, Loop::Track).await;
         //     println!("loop status set result: {:?}", result);
         // }
-
         // let min_rate = player.get(MinimumRate).await;
         // if let Ok(_) = min_rate && can_control {
         //     let result = player.set_controlled(Rate, 0.5).await;
         //     println!("set rate result: {:?}", result);
         // }
-        
+        // let path_to_media = String::from("file:///home/USER/definitely_not_hentai.mp3");
+        // if can_control && player.get(SupportedURIs).await.unwrap_or(vec![]).contains(&String::from("file")) {
+        //     player.open_uri(path_to_media).await.expect("Failed to open peak");
+        // }
 
+        
         // Subscribe to the event when Metadata changed.
         // streams.push(player.property_changed::<HashMap<String, OwnedValue>>("org.mpris.MediaPlayer2.Player", "Metadata").await.unwrap());
 

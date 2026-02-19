@@ -1,46 +1,16 @@
-//! Property types you can use to get properties with. There are also constants so you dont have to turbofish everything
+//! Type definitions of the properties that could be set or parsed.
+//! <br>Used with: [Player](super::Player)
 
 use std::{collections::HashMap, time::Duration};
 
 use zbus::zvariant::OwnedValue;
 
 use crate::{Loop, Metadata as Mtd, Playback};
-
-/// An dbus, MPRIS interface
-#[derive(Debug, Default)]
-pub enum Interface {
-    #[default]
-    MediaPlayer2,
-    Player,
-    TrackList,
-    Playlists
-}
-impl ToString for Interface {
-    fn to_string(&self) -> String {
-        use Interface::*;
-        match *self {
-            MediaPlayer2 => String::from("org.mpris.MediaPlayer2"),
-            Player => String::from("org.mpris.MediaPlayer2.Player"),
-            TrackList => String::from("org.mpris.MediaPlayer2.TrackList"),
-            Playlists => String::from("org.mpris.MediaPlayer2.Playlists")
-        }
-    }
-}
-impl Interface {
-    fn as_str(&self) -> &'static str {
-        use Interface::*;
-        match *self {
-            MediaPlayer2 => "org.mpris.MediaPlayer2",
-            Player => "org.mpris.MediaPlayer2.Player",
-            TrackList => "org.mpris.MediaPlayer2.TrackList",
-            Playlists => "org.mpris.MediaPlayer2.Playlists",
-        }
-    }
-}
+use crate::player::enums::Interface;
 
 
-/// We can use this to get all properties available for reading from the bus.
-/// <br>All property must implement this, and properties that can be changed also implement [WritableProperty], or [ControlWritableProperty].
+/// Can be used to get some property from the bus.
+/// <br>Properties also may implement [WritableProperty], or [ControlWritableProperty] (but shouldn't implement both at the same time).
 pub trait Property {
     /// Parses form zbus's Value as this, with into_output transformations may be applied
     type ParseAs: serde::de::DeserializeOwned + Send + 'static;
@@ -60,13 +30,15 @@ pub trait Property {
     fn into_output(&self, value: Self::ParseAs) -> Self::Output;
 }
 
-/// Implementators of this are writable properties
+/// Implementators of this are writable [properties](Property).
+/// <br> A [Property] should not implement both this and [ControlWritableProperty] at the same time!
 pub trait WritableProperty : Property {
     /// The opposite of [Property::into_output], as it converts the [Property::Output] into [Property::ParseAs]
     fn from_output(&self, value: Self::Output) -> Self::ParseAs;
 }
 
-/// A property that can be modified, but only if [CanControl] is true. A property should not implement both this and [WritableProperty] at the same time
+/// Implementors are [properties](Property) that can be modified, but only if [CanControl] is true. 
+/// A [Property] should not implement both this and [WritableProperty] at the same time!
 /// <br>According to the specs, this describes the player's implementation, rather than the current state, meaning this wont change after an object is registered.
 pub trait ControlWritableProperty : Property {
     /// The opposite of [Property::into_output], as it converts the [Property::Output] into [Property::ParseAs]
@@ -479,9 +451,8 @@ impl Property for Metadata {
 
 
 
-/// Whether the client can call the Next method on this interface and expect the current track to change. 
-/// <br>Even when playback can generally be controlled, there may not always be a next track to move to. 
-// TODO_DOCS!!!!
+/// Whether it's possible to call [super::Player::next] method and expect the current track to change. 
+/// <br>(Even when playback can generally be controlled, there may not always be a next track to move to)
 pub struct CanGoNext;
 impl Property for CanGoNext {
     type Output = bool;

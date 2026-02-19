@@ -7,11 +7,13 @@ use zbus::Connection;
 use crate::Player;
 
 #[derive(Debug, Clone)]
+/// Provides a convenient way to connect to the dbus and retrieve the MPRIS players.
 pub struct Mpris {
     connection: Connection,
 }
 
 impl Mpris {
+    /// Creates a new connection
     pub async fn new() -> Result<Self, zbus::Error> {
         let connection = Connection::session().await?;
 
@@ -22,6 +24,7 @@ impl Mpris {
         )
     }
 
+    /// Gets all currently available players.
     pub async fn get_players(&self) -> Result<Vec<Arc<Player>>, zbus::Error> {
         let proxy = zbus::fdo::DBusProxy::new(&self.connection).await?;
         let names = proxy.list_names().await?;

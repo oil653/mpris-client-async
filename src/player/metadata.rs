@@ -3,7 +3,8 @@ use std::{collections::HashMap, time::Duration};
 use zbus::zvariant::OwnedValue;
 
 /// Metadata of a media
-/// <br>It's construced from the [metadata specs](www.freedesktop.org/wiki/Specifications/mpris-spec/metadata/).
+/// <br>It's construced from the [metadata specs](https://www.freedesktop.org/wiki/Specifications/mpris-spec/metadata/).
+/// <br>Dont assume any of this is actually provided (other than trackid), but basics such as title, artists, and sometimes the album is provided.
 #[derive(Debug, Clone)]
 pub struct Metadata {
     // MPRIS specific things
@@ -32,7 +33,7 @@ pub struct Metadata {
     pub lyrics: String,
     /// BPM of the song
     pub bpm: i64,
-    /// An automatically-generated rating, based on things such as how often it has been played. This should be in the range 0.0 to 1.0.
+    /// An automatically-generated rating, based on things such as how often it has been played. This should be in between 0.0 and 1.0.
     pub auto_rating: f64,
     /// A rating given to the track by the user, between 0.0 and 1.0
     pub user_rating: f64,
