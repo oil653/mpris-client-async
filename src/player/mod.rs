@@ -3,7 +3,7 @@ use zbus::{Connection, Proxy, fdo, names::OwnedBusName, zvariant::{OwnedValue, V
 mod metadata;
 pub use metadata::Metadata;
 
-pub use crate::player::properties::{WritableProperty, Property, ControlWriteProperty};
+pub use crate::player::properties::{WritableProperty, Property, ControlWritableProperty};
 
 pub mod properties;
 
@@ -12,15 +12,15 @@ pub use enums::*;
 
 
 
-/// A player that cannot be [controlled](ControlWriteProperty)
+/// A player that cannot be [controlled](ControlWritableProperty)
 #[derive(Debug, Clone)]
-pub struct NormalPlayer {
+pub struct Player {
     /// Well known name
     name: OwnedBusName,
     /// Connection to the bus
     connection: Connection
 }
-impl NormalPlayer {
+impl Player {
     /// Creates an instance from a "well known name", and a connection
     pub async fn new(name: OwnedBusName, connection: Connection) -> Self {
         Self {
@@ -52,27 +52,30 @@ impl NormalPlayer {
         Ok(property.into_output(parsed))
     }
 
-    /// Set a regular property. To set something that implements [ControlWriteProperty], check [Self::set_controlled]
-    pub async fn set<'a, P>(&self, property: P, new_value: P::ParseAs) -> Result<(), fdo::Error>
+    /// Set a property that implements [WritableProperty].
+    /// <br>To set something that implements [ControlWritableProperty], check [Self::set_controlled]
+    pub async fn set<'a, P>(&self, property: P, new_value: P::Output) -> Result<(), fdo::Error>
     where 
         P: WritableProperty,
         P::ParseAs: 'a + Into<Value<'a>>
     {
         let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", property.interface()).await?;
+        let transformed_value: P::ParseAs = property.from_output(new_value);
 
-        proxy.set_property(property.name(), new_value).await.map(|_| ())
+        proxy.set_property(property.name(), transformed_value).await.map(|_| ())
     }
 
 
-    /// Sets a property that requires CanControl to true. If it's false, it will return with an [fdo::Error]
-    pub async fn set_controlled<'a, P>(&self, property: P, new_value: P::ParseAs) -> Result<(), fdo::Error>
+    /// Sets a property that requires [properties::CanControl] to be true.
+    pub async fn set_controlled<'a, P>(&self, property: P, new_value: P::Output) -> Result<(), fdo::Error>
     where 
-        P: ControlWriteProperty,
+        P: ControlWritableProperty,
         P::ParseAs: 'a + Into<Value<'a>>
     {
         let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", property.interface()).await?;
+        let transformed_value: P::ParseAs = property.from_output(new_value);
 
-        proxy.set_property(property.name(), new_value).await.map(|_| ())
+        proxy.set_property(property.name(), transformed_value).await.map(|_| ())
     }
 }
 

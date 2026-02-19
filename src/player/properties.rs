@@ -40,7 +40,7 @@ impl Interface {
 
 
 /// We can use this to get all properties available for reading from the bus.
-/// <br>All property must implement this, and properties that can be changed also implement [WritableProperty]
+/// <br>All property must implement this, and properties that can be changed also implement [WritableProperty], or [ControlWritableProperty].
 pub trait Property {
     /// Parses form zbus's Value as this, with into_output transformations may be applied
     type ParseAs: serde::de::DeserializeOwned + Send + 'static;
@@ -61,11 +61,17 @@ pub trait Property {
 }
 
 /// Implementators of this are writable properties
-pub trait WritableProperty : Property {}
+pub trait WritableProperty : Property {
+    /// The opposite of [Property::into_output], as it converts the [Property::Output] into [Property::ParseAs]
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs;
+}
 
-/// A property that can be modified, but only if CanWrite is true. A property should not implement both this and [WritableProperty] at the same time
-/// <br>According to the specs, this describes the player's implementation, rather than the current state, that might change.
-pub trait ControlWriteProperty : Property {}
+/// A property that can be modified, but only if [CanControl] is true. A property should not implement both this and [WritableProperty] at the same time
+/// <br>According to the specs, this describes the player's implementation, rather than the current state, meaning this wont change after an object is registered.
+pub trait ControlWritableProperty : Property {
+    /// The opposite of [Property::into_output], as it converts the [Property::Output] into [Property::ParseAs]
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs;
+}
 
 /// If false, calling Quit will have no effect. 
 /// <br>If true, calling Quit will cause the media application to <b>attempt</b> to quit 
@@ -85,7 +91,8 @@ impl Property for CanQuit {
 }
 
 
-/// If it's possible to control the some of player's properties. These types implement [ControlWriteProperty]!
+/// If it's possible to control the some of player's properties. These types implement [ControlWritableProperty]!
+/// <br>According to the specs, this describes the player's implementation, rather than the current state, meaning this wont change after an object is registered.
 pub struct CanControl;
 impl Property for CanControl {
     type Output = bool;
@@ -121,7 +128,11 @@ impl Property for Fullscreen {
         value
     }
 }
-impl WritableProperty for Fullscreen {}
+impl WritableProperty for Fullscreen {
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs {
+        value.into()
+    }
+}
 
 
 
@@ -287,7 +298,11 @@ impl Property for LoopStatus {
         "LoopStatus"
     }
 }
-impl ControlWriteProperty for LoopStatus {}
+impl ControlWritableProperty for LoopStatus {
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs {
+        value.to_string()
+    }
+}
 
 
 
@@ -315,13 +330,17 @@ impl Property for Rate {
         "Rate"
     }
 }
-impl WritableProperty for Rate {}
+impl ControlWritableProperty for Rate {
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs {
+        value.into()
+    }
+}
 
 
 
 /// The minimum value which the Rate property can take. Clients should not attempt to set the Rate property below this value.
 /// <br>Note that even if this value is 0.0 or negative, clients should not attempt to set the Rate property to 0.0.
-/// <br>This value should always be 1.0 or less.
+/// <br>This value should always be 1.0 or less, but some players might return [zbus::fdo::Error::NotSupported].
 pub struct MinimumRate;
 impl Property for MinimumRate {
     type Output = f64;
@@ -343,7 +362,7 @@ impl Property for MinimumRate {
 
 
 /// The maximum value which the Rate property can take. Clients should not attempt to set the Rate property above this value.
-/// <br>This value should always be 1.0 or greater.
+/// <br>This value should always be 1.0 or greater, but some players might return [zbus::fdo::Error::NotSupported].
 pub struct MaximumRate;
 impl Property for MaximumRate {
     type Output = f64;
@@ -404,7 +423,11 @@ impl Property for Shuffle {
         "Shuffle"
     }
 }
-impl ControlWriteProperty for Shuffle {}
+impl ControlWritableProperty for Shuffle {
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs {
+        value.into()
+    }
+}
 
 
 
@@ -426,7 +449,11 @@ impl Property for Volume {
         "Volume"
     }
 }
-impl ControlWriteProperty for Volume {}
+impl ControlWritableProperty for Volume {
+    fn from_output(&self, value: Self::Output) -> Self::ParseAs {
+        value.into()
+    }
+}
 
 
 

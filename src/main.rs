@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mpris_client_async::{Mpris, properties::*};
+use mpris_client_async::{Loop, Mpris, properties::*};
 
 #[tokio::main]
 async fn main() {
@@ -28,12 +28,8 @@ async fn main() {
         println!("\t\t\tsupported URI: {:?}",           player.get(SupportedURIs).await.unwrap_or(vec![]));
         println!("\t\t\tsupported MIME types: {:?}",    player.get(SupportedMIMEs).await.unwrap_or(vec![]));
 
-        // if player.get(CanQuit).await.unwrap_or(false) {
-            
-        // }
-
-        // if player.can_raise().await {
-        //     _ = player.raise().await;
+        // if player.get(CanSetFullscreen).await.unwrap_or(false) {
+        //     player.set(Fullscreen, !player.get(Fullscreen).await.unwrap_or(false)).await.expect("Failed to set fullscreen.");
         // }
 
         println!("\tMediaPlayer2.Player:");
@@ -48,6 +44,19 @@ async fn main() {
         println!("\t\tcan_control: {}",                 player.get(CanControl).await.unwrap_or(false));
 
         println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
+
+        // let can_control = player.get(CanControl).await.unwrap_or(false);
+        // if can_control {
+        //     let result = player.set_controlled(LoopStatus, Loop::Track).await;
+        //     println!("loop status set result: {:?}", result);
+        // }
+
+        // let min_rate = player.get(MinimumRate).await;
+        // if let Ok(_) = min_rate && can_control {
+        //     let result = player.set_controlled(Rate, 0.5).await;
+        //     println!("set rate result: {:?}", result);
+        // }
+        
 
         // Subscribe to the event when Metadata changed.
         // streams.push(player.property_changed::<HashMap<String, OwnedValue>>("org.mpris.MediaPlayer2.Player", "Metadata").await.unwrap());
