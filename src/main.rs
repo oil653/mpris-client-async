@@ -1,16 +1,18 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
+use futures::{StreamExt, stream::select_all};
 use mpris_client_async::{Loop, Mpris, properties::*};
+use zbus::zvariant::OwnedValue;
 
 #[tokio::main]
 async fn main() {
     let mpris: Mpris = Mpris::new().await.unwrap();
     let players = mpris.get_players().await.unwrap();
     
-    // let mut streams = Vec::new();
+    let mut metadata_streams= Vec::new();
 
     // Get the "unique name" of the players
-    for player in players {
+    for player in &players {
         println!("Player: {}, with identity {} with desktop entry {}", 
             player.dbus_name(),
             player.get(Identity).await.unwrap_or("??".to_string()),
@@ -62,14 +64,13 @@ async fn main() {
 
         
         // Subscribe to the event when Metadata changed.
-        // streams.push(player.property_changed::<HashMap<String, OwnedValue>>("org.mpris.MediaPlayer2.Player", "Metadata").await.unwrap());
+        metadata_streams.push(player.property_changed_stream(Metadata).await.unwrap());
 
         println!();
     }
-    
-    // let mut combined = select_all(streams);
-    // while let Some(msg) = combined.next().await {
-    //     let metadata: Metadata = msg.get().await.unwrap().into();
-    //     println!("{:#?}", metadata);
-    // }
+
+    let mut combined = select_all(metadata_streams);
+    while let Some(value) = combined.next().await {
+        println!("Metadata changed for some player: {:?}", value.get().await);
+    }
 }

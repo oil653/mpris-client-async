@@ -29,12 +29,21 @@ impl Mpris {
         let proxy = zbus::fdo::DBusProxy::new(&self.connection).await?;
         let names = proxy.list_names().await?;
 
-        Ok(
+        Ok (
             join_all(names   
-                .iter()
-                .filter(|name| name.starts_with("org.mpris.MediaPlayer2"))
-                .map (async |name| Arc::new(Player::new(name.clone(), self.connection.clone()).await))
-            ).await
+                    .iter()
+                    .filter(|name| name.starts_with("org.mpris.MediaPlayer2"))
+                    .map (async |name| Player::new(name.clone(), self.connection.clone()).await)
+                )
+            .await
+            .into_iter()
+            .try_fold(Vec::new(), |mut vec, player| match player {
+                Ok(v) => { 
+                    vec.push(Arc::new(v));
+                    Ok(vec)   
+                },
+                Err(e) => return Err(e)
+            })?
         )
     }
 }

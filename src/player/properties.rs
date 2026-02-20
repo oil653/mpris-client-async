@@ -22,8 +22,8 @@ pub trait Property {
     fn name(&self) -> &'static str;
 
     /// The interface the property is on. 
-    fn interface(&self) -> &'static str {
-        Interface::default().as_str()
+    fn interface(&self) -> Interface {
+        Interface::default()
     }
 
     /// Convert the parsed value into the final Output
@@ -70,8 +70,8 @@ impl Property for CanControl {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -237,8 +237,8 @@ impl Property for PlaybackStatus {
     type Output = Playback;
     type ParseAs = String;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -258,8 +258,8 @@ impl Property for LoopStatus {
     type Output = Loop;
     type ParseAs = String;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -290,8 +290,8 @@ impl Property for Rate {
     type Output = f64;
     type ParseAs = f64;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -318,8 +318,8 @@ impl Property for MinimumRate {
     type Output = f64;
     type ParseAs = f64;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -340,8 +340,8 @@ impl Property for MaximumRate {
     type Output = f64;
     type ParseAs = f64;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -363,8 +363,8 @@ impl Property for Position {
     type Output = Duration;
     type ParseAs = i64;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -383,8 +383,8 @@ impl Property for Shuffle {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -409,8 +409,8 @@ impl Property for Volume {
     type Output = f64;
     type ParseAs = f64;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -436,8 +436,8 @@ impl Property for Metadata {
     type Output = Mtd;
     type ParseAs = HashMap<String, OwnedValue>;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -458,8 +458,8 @@ impl Property for CanGoNext {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -480,8 +480,8 @@ impl Property for CanGoPrevious {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -502,8 +502,8 @@ impl Property for CanPlay {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -524,8 +524,8 @@ impl Property for CanPause {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {
@@ -548,8 +548,8 @@ impl Property for CanSeek {
     type Output = bool;
     type ParseAs = bool;
 
-    fn interface(&self) -> &'static str {
-        Interface::Player.as_str()
+    fn interface(&self) -> Interface {
+        Interface::Player
     }
 
     fn into_output(&self, value: Self::ParseAs) -> Self::Output {

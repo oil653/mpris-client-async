@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use zbus::{Connection, Proxy, fdo, names::OwnedBusName, zvariant::{OwnedValue, Value}};
+use zbus::{Connection, Proxy, fdo, names::OwnedBusName, proxy::{self, PropertyStream}, zvariant::{OwnedValue, Value}};
 
 mod metadata;
 pub use metadata::Metadata;
@@ -20,15 +20,46 @@ pub struct Player {
     /// Well known name
     name: OwnedBusName,
     /// Connection to the bus
-    connection: Connection
+    connection: Connection,
+    /// A proxy to "org.mpris.MediaPlayer2"
+    proxy: Option<Proxy<'static>>,
+    /// A proxy to "org.mpris.MediaPlayer2.Player"
+    player_proxy: Option<Proxy<'static>>,
+    /// A proxy to "org.mpris.MediaPlayer2.TrackList"
+    tracklist_proxy: Option<Proxy<'static>>,
+    /// A proxy to "org.mpris.MediaPlayer2.Playlists"
+    playlists_proxy: Option<Proxy<'static>>
 }
 impl Player {
+    async fn create_proxy(connection: &Connection, name: &OwnedBusName, iface: Interface) -> Result<Proxy<'static>, zbus::Error> {
+        Ok(
+            proxy::Builder::new(connection)
+                .destination(name.to_owned())?
+                .path("/org/mpris/MediaPlayer2")?
+                .interface(iface.to_string())?
+                .cache_properties(proxy::CacheProperties::Yes)
+                .build()
+                .await?
+        )
+    }
+
     /// Creates an instance from a "well known name", and a connection
-    pub async fn new(name: OwnedBusName, connection: Connection) -> Self {
-        Self {
-            name,
-            connection,
-        }
+    pub async fn new(name: OwnedBusName, connection: Connection) -> Result<Self, zbus::Error> {
+        let proxy = Self::create_proxy(&connection, &name, Interface::MediaPlayer2).await.ok();
+        let player_proxy= Self::create_proxy(&connection, &name, Interface::Player).await.ok();
+        let tracklist_proxy = Self::create_proxy(&connection, &name, Interface::TrackList).await.ok();
+        let playlists_proxy = Self::create_proxy(&connection, &name, Interface::Playlists).await.ok();
+
+        Ok(
+            Self {
+                name,
+                connection,
+                proxy,
+                player_proxy,
+                tracklist_proxy,
+                playlists_proxy
+            }
+        )
     }
 
     /// Returns the ["unique name"](https://z-galaxy.github.io/zbus/concepts.html#bus-name--service-name) of the player.
@@ -37,13 +68,27 @@ impl Player {
         self.name.to_string()
     }
 
+    fn proxy(&self, interface: Interface) -> Result<&Proxy<'static>, zbus::Error> {
+        let iface = match interface {
+            Interface::MediaPlayer2 => &self.proxy,
+            Interface::Player => &self.player_proxy,
+            Interface::Playlists => &self.playlists_proxy,
+            Interface::TrackList => &self.tracklist_proxy,
+        };
+
+        match iface {
+            Some(v) => Ok(&v),
+            None => Err(zbus::Error::InterfaceNotFound)
+        }
+    }
+
     /// Parses a property from the player. See [properties] for more
     pub async fn get<P>(&self, property: P) -> Result<P::Output, zbus::Error>
     where 
         P: Property,
         P::ParseAs: TryFrom<OwnedValue>
     {
-        let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", property.interface()).await?;
+        let proxy = self.proxy(property.interface())?;
 
         let value: OwnedValue = proxy.get_property(property.name()).await?;
 
@@ -61,7 +106,7 @@ impl Player {
         P: WritableProperty,
         P::ParseAs: 'a + Into<Value<'a>>
     {
-        let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", property.interface()).await?;
+        let proxy = self.proxy(property.interface())?;
         let transformed_value: P::ParseAs = property.from_output(new_value);
 
         proxy.set_property(property.name(), transformed_value).await.map(|_| ())
@@ -74,15 +119,34 @@ impl Player {
         P: ControlWritableProperty,
         P::ParseAs: 'a + Into<Value<'a>>
     {
-        let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", property.interface()).await?;
+        let proxy = self.proxy(property.interface())?;
         let transformed_value: P::ParseAs = property.from_output(new_value);
 
         proxy.set_property(property.name(), transformed_value).await.map(|_| ())
     }
 
+    /// Returns a stream that fires every time a property of some kind had been changed.
+    pub async fn property_changed_stream<'a, P>(&self, property: P) -> Result<PropertyStream<'_, P::ParseAs>, zbus::Error> 
+    where 
+        P: Property,
+        P::ParseAs: 'a + Into<Value<'a>>
+    {
+        let proxy = self.proxy(property.interface())?;
+
+        Ok(proxy.receive_property_changed(property.name()).await)
+    }
+
+
+    
+
+
+
+
     //                             ====================
     //                             ===    METHODS   ===
     //                             ====================
+
+    
     async fn call_method<A, R>(&self, method_name: &str, arguments: A, iface: Interface) -> Result<R, zbus::Error> 
     where 
         A: serde::Serialize + zbus::zvariant::DynamicType,
@@ -92,8 +156,6 @@ impl Player {
 
         proxy.call(method_name, &arguments).await
     }
-
-    
 
     /// Skips to the next track in the tracklist. If there is no next track (and endless playback and track repeat are both off), stop playback.
     /// <br>If playback is paused or stopped, it remains that way.
