@@ -1,5 +1,4 @@
-//! Type definitions of the properties that could be set or parsed.
-//! <br>Used with: [Player](super::Player)
+//! Types of the properties of a [`Player`](super::Player)
 
 use std::{collections::HashMap, time::Duration};
 
@@ -45,6 +44,7 @@ pub trait ControlWritableProperty : Property {
     fn from_output(&self, value: Self::Output) -> Self::ParseAs;
 }
 
+pub const CANQUIT: CanQuit = CanQuit;
 /// If false, calling Quit will have no effect. 
 /// <br>If true, calling Quit will cause the media application to <b>attempt</b> to quit 
 /// (although it may still be prevented from quitting by the user, for example). 
@@ -62,7 +62,7 @@ impl Property for CanQuit {
     }
 }
 
-
+pub const CANCONTROL: CanControl = CanControl;
 /// If it's possible to control the some of player's properties. These types implement [ControlWritableProperty]!
 /// <br>According to the specs, this describes the player's implementation, rather than the current state, meaning this wont change after an object is registered.
 pub struct CanControl;
@@ -85,7 +85,7 @@ impl Property for CanControl {
 
 
 
-
+pub const FULLSCREEN: Fullscreen = Fullscreen;
 /// Whether the media player is occupying the fullscreen. 
 pub struct Fullscreen;
 impl Property for Fullscreen {
@@ -107,7 +107,7 @@ impl WritableProperty for Fullscreen {
 }
 
 
-
+pub const CANSETFULLSCREEN: CanSetFullscreen = CanSetFullscreen;
 /// If false setting Fullscreen will have no effect
 pub struct CanSetFullscreen;
 impl Property for CanSetFullscreen {
@@ -124,7 +124,7 @@ impl Property for CanSetFullscreen {
 }
 
 
-
+pub const CANRAISE: CanRaise = CanRaise;
 /// If raise() will work. 
 /// <br>Note: raising is the process of bringing the media player to front, for example maximizing it, or jumping to it in the visual environment.
 pub struct CanRaise;
@@ -142,7 +142,7 @@ impl Property for CanRaise {
 }
 
 
-
+pub const HASTRACKLIST: HasTrackList = HasTrackList;
 /// If the player has tracklist
 pub struct HasTrackList;
 impl Property for HasTrackList {
@@ -159,7 +159,7 @@ impl Property for HasTrackList {
 }
 
 
-
+pub const IDENTITY: Identity = Identity;
 /// The "display name" of the player. For example "Mozilla Firefox" or "VLC media player"
 pub struct Identity;
 impl Property for Identity {
@@ -176,7 +176,7 @@ impl Property for Identity {
 }
 
 
-
+pub const DESKTOPENTRY: DesktopEntry = DesktopEntry;
 /// The desktop entry of the player. For example "firefox" or "vlc"
 pub struct DesktopEntry;
 impl Property for DesktopEntry {
@@ -193,7 +193,7 @@ impl Property for DesktopEntry {
 }
 
 
-
+pub const SUPPORTEDURIS: SupportedURIs = SupportedURIs;
 /// The URI schemes supported by the media player.This can be viewed as protocols supported by the player in almost all cases. 
 pub struct SupportedURIs;
 impl Property for SupportedURIs {
@@ -211,7 +211,7 @@ impl Property for SupportedURIs {
 
 
 
-
+pub const SUPPORTEDMIMES: SupportedMIMEs = SupportedMIMEs;
 /// The mime-types supported by the media player.
 /// <br>Mime-types should be in the standard format (eg: audio/mpeg or application/ogg).
 pub struct SupportedMIMEs;
@@ -230,7 +230,7 @@ impl Property for SupportedMIMEs {
 
 
 
-
+pub const PLAYBACKSTATUS: PlaybackStatus = PlaybackStatus;
 /// The current playback status, see [super::Playback] for more details
 pub struct PlaybackStatus;
 impl Property for PlaybackStatus {
@@ -251,7 +251,7 @@ impl Property for PlaybackStatus {
 }
 
 
-
+pub const LOOPSTATUS: LoopStatus = LoopStatus;
 /// The current loop / repeat status. See [super::Loop] for more details
 pub struct LoopStatus;
 impl Property for LoopStatus {
@@ -277,7 +277,7 @@ impl ControlWritableProperty for LoopStatus {
 }
 
 
-
+pub const RATE: Rate = Rate;
 /// The current playback rate. This allows clients to display (reasonably) accurate progress bars without having to regularly query the media player for the current position. 
 /// 
 /// <br>The value must fall in the range described by MinimumRate and MaximumRate, and must not be 0.0. 
@@ -309,7 +309,7 @@ impl ControlWritableProperty for Rate {
 }
 
 
-
+pub const MINIMUMRATE: MinimumRate = MinimumRate;
 /// The minimum value which the Rate property can take. Clients should not attempt to set the Rate property below this value.
 /// <br>Note that even if this value is 0.0 or negative, clients should not attempt to set the Rate property to 0.0.
 /// <br>This value should always be 1.0 or less, but some players might return [zbus::fdo::Error::NotSupported].
@@ -332,7 +332,7 @@ impl Property for MinimumRate {
 }
 
 
-
+pub const MAXIMUMRATE: MaximumRate = MaximumRate;
 /// The maximum value which the Rate property can take. Clients should not attempt to set the Rate property above this value.
 /// <br>This value should always be 1.0 or greater, but some players might return [zbus::fdo::Error::NotSupported].
 pub struct MaximumRate;
@@ -354,7 +354,7 @@ impl Property for MaximumRate {
 }
 
 
-
+pub const POSITION: Position = Position;
 /// The current track position, between 0 and the 'mpris:length' metadata entry (see [Metadata]).
 /// <br>Note: If the media player allows it, the current playback position can be changed either the SetPosition method or the Seek.
 /// <br>If the playback progresses in a way that is inconstistant with the Rate property, the Seeked signal is emited.
@@ -376,7 +376,7 @@ impl Property for Position {
     }
 }
 
-
+pub const SHUFFLE: Shuffle = Shuffle;
 /// A value of false indicates that playback is progressing linearly through a playlist, while true means playback is progressing through a playlist in some other order. 
 pub struct Shuffle;
 impl Property for Shuffle {
@@ -402,7 +402,7 @@ impl ControlWritableProperty for Shuffle {
 }
 
 
-
+pub const VOLUME: Volume = Volume;
 /// Should be between 0.0 and 1.0, while higher settings are possible as well (tho not reccommended)
 pub struct Volume;
 impl Property for Volume {
@@ -429,7 +429,7 @@ impl ControlWritableProperty for Volume {
 
 
 
-
+pub const METADATA: Metadata = Metadata;
 /// See [super::Metadata] for more details
 pub struct Metadata;
 impl Property for Metadata {
@@ -450,7 +450,7 @@ impl Property for Metadata {
 }
 
 
-
+pub const CANGONEXT: CanGoNext = CanGoNext;
 /// Whether it's possible to call [super::Player::next] method and expect the current track to change. 
 /// <br>(Even when playback can generally be controlled, there may not always be a next track to move to)
 pub struct CanGoNext;
@@ -472,7 +472,7 @@ impl Property for CanGoNext {
 }
 
 
-
+pub const CANGOPREVIOUS: CanGoPrevious = CanGoPrevious;
 /// Whether the client can call the Previous method on this interface and expect the current track to change.
 /// <br>Even when playback can generally be controlled, there may not always be a next previous to move to. 
 pub struct CanGoPrevious;
@@ -494,7 +494,7 @@ impl Property for CanGoPrevious {
 }
 
 
-
+pub const CANPLAY: CanPlay = CanPlay;
 /// Whether playback can be started using Play or PlayPause. 
 /// <br>Even when playback can generally be controlled, it may not be possible to enter a "playing" state, for example if there is no "current track". 
 pub struct CanPlay;
@@ -516,7 +516,7 @@ impl Property for CanPlay {
 }
 
 
-
+pub const CANPAUSE: CanPause = CanPause;
 /// Whether playback can be paused using Pause or PlayPause. 
 /// <br>Not all media is pausable: it may not be possible to pause some streamed media, for example. 
 pub struct CanPause;
@@ -539,7 +539,7 @@ impl Property for CanPause {
 
 
 
-
+pub const CANSEEK: CanSeek = CanSeek;
 /// Whether the client can control the playback position using Seek and SetPosition. This may be different for different tracks. 
 /// <br>If [CanControl] is false, this should be (considered) false too.
 /// <br>Not all media is seekable: it may not be possible to seek when playing some streamed media, for example.

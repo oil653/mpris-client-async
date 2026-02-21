@@ -1,6 +1,6 @@
 use std::fmt;
 
-/// An dbus, MPRIS interface
+/// A dbus, MPRIS interface
 #[derive(Debug, Default)]
 pub enum Interface {
     #[default]

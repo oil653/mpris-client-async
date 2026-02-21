@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use futures::{StreamExt, stream::select_all};
-use mpris_client_async::{Loop, Mpris, properties::*};
+use mpris_client_async::{Loop, Mpris, properties::*, signals::{SEEKED, Seeked, Signal}};
 use zbus::zvariant::OwnedValue;
 
 #[tokio::main]
@@ -10,6 +10,7 @@ async fn main() {
     let players = mpris.get_players().await.unwrap();
     
     let mut metadata_streams= Vec::new();
+    let mut seeked_signals = Vec::new();
 
     // Get the "unique name" of the players
     for player in &players {
@@ -45,7 +46,7 @@ async fn main() {
         println!("\t\tcan_seek: {}",                    player.get(CanSeek).await.unwrap_or(false));
         println!("\t\tcan_control: {}",                 player.get(CanControl).await.unwrap_or(false));
 
-        println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
+        // println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
 
         // let can_control = player.get(CanControl).await.unwrap_or(false);
         // if can_control {
@@ -65,12 +66,28 @@ async fn main() {
         
         // Subscribe to the event when Metadata changed.
         metadata_streams.push(player.property_changed_stream(Metadata).await.unwrap());
+        seeked_signals.push(player.subscribe(Seeked).await.unwrap());
 
         println!();
     }
 
-    let mut combined = select_all(metadata_streams);
-    while let Some(value) = combined.next().await {
-        println!("Metadata changed for some player: {:?}", value.get().await);
-    }
+    // Combine the streams of the changes. YOU CANNOT KNOW WHICH PLAYER A MESSAGE IS FROM!
+    // let mut combined = select_all(metadata_streams);
+    // while let Some(value) = combined.next().await {
+    //     let raw = value.get().await.expect("Failed to get body of a signal change");
+    //     let parsed = METADATA.into_output(raw);
+
+    //     println!("Metadata changed for some player: {:#?}", parsed);
+    // }
+
+
+    
+    // Listen for seeked signals (wont know which player it is from, as they're combined)
+    // let mut combined = select_all(seeked_signals);
+    // while let Some(seeked_to) = combined.next().await {
+    //     let raw: i64 = seeked_to.body().deserialize::<i64>().expect("Failed to deseralize signal message body");
+    //     let parsed = SEEKED.into_output(raw);
+
+    //     println!("Some player seeked to: {}", parsed.as_secs());
+    // }
 }

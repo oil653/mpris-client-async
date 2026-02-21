@@ -1,16 +1,33 @@
 use std::time::Duration;
 
-use zbus::{Connection, Proxy, fdo, names::OwnedBusName, proxy::{self, PropertyStream}, zvariant::{OwnedValue, Value}};
+use zbus::{Connection, Proxy, fdo, names::OwnedBusName, proxy::{self, PropertyStream, SignalStream}, zvariant::{OwnedValue, Value}};
 
 mod metadata;
 pub use metadata::Metadata;
 
 pub use crate::player::properties::{WritableProperty, Property, ControlWritableProperty};
+use crate::player::signals::Signal;
 
 pub mod properties;
+pub mod signals;
 
 mod enums;
 pub use enums::*;
+
+// /// A stream that fires when some property of the player is changed, returning a message
+// pub struct PlayerStream<'a> {
+//     pub player: &'a Player,
+    
+// }
+
+
+/// Returns the current position of the media of a [`Player`] every second, without polling the player.
+/// <br><br>Note: this doesn't take into account the length of the media, as it might not be provided (meaning the returned position could be longer than the length of the media).
+/// It only considers the current [playback status](Playback), the current [rate](properties::Rate), and if the Seeked signal was emmited, or the media changed
+// TODO_DOCS
+// pub struct PositionStream<> {
+
+// }
 
 
 
@@ -136,10 +153,17 @@ impl Player {
         Ok(proxy.receive_property_changed(property.name()).await)
     }
 
+    /// Subscribe to a dbus signal. Possible options: [`signals`]
+    pub async fn subscribe<'a, S>(&self, signal: S) -> Result<SignalStream<'_>, zbus::Error> 
+    where 
+        S: Signal,
+        S::ParseAs: 'a + Into<Value<'a>>
+    {
+        let proxy = self.proxy(signal.interface())?;
 
+        Ok(proxy.receive_signal(signal.name()).await?)
+    }
     
-
-
 
 
     //                             ====================
@@ -216,50 +240,6 @@ impl Player {
         self.call_method("OpenUri", [uri], Interface::Player).await
     }
 }
-
-
-
-// async fn call_method<A, R>(&self, method_name: &str, arguments: A, iface: &str) -> Result<R, zbus::Error> 
-// where 
-//     A: serde::Serialize + zbus::zvariant::DynamicType,
-//     R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
-// {
-//     let proxy = Proxy::new(&self.connection, self.name.to_owned(), "/org/mpris/MediaPlayer2", iface.to_owned()).await?;
-
-//     proxy.call(method_name, &arguments).await
-// }
-
-    // /// Returns a stream that fires every time a property of some kind had been changed. 
-    // /// <br>If the connection is not active (the MPRIS object is dropped, or for some reason the underlying connection breaks it will yield None)
-    // pub async fn property_changed<'a, T>(&'a self, iface: &str, prop_name: &'static str) -> Result<PropertyStream<'static, T>, zbus::Error> {
-    //     let proxy: Proxy<'_> = proxy::Builder::
-    //         new(&self.connection)
-    //         .destination(self.name.to_owned())?
-    //         .path("/org/mpris/MediaPlayer2")?
-    //         .interface(iface.to_owned())?
-    //         .cache_properties(proxy::CacheProperties::Yes)
-    //         .build()
-    //         .await?;
-
-    //     Ok(proxy.receive_property_changed(prop_name).await)
-    // }
-
-    
-    
-    
-    //                             ====================
-    //                             ===    METHODS   ===
-    //                             ====================
-
-    // /// The player will try to quit, which may or may not succeed.
-    // pub async fn quit(&self) -> Result<(), zbus::Error> {
-    //     self.call_method("Quit",[()], "org.mpris.MediaPlayer2").await
-    // }
-
-    // /// When raised, the player will try to bring itself to the front of the UI.
-    // pub async fn raise(&self) -> Result<(), zbus::Error> {
-    //     self.call_method("Raise",[()], "org.mpris.MediaPlayer2").await
-    // }
 
 
 #[cfg(test)]
