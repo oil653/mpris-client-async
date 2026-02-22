@@ -1,12 +1,12 @@
-use std::time::Duration;
+use std::{ops::Deref, pin::Pin, task::{Context, Poll}, time::Duration};
 
-use zbus::{Connection, Proxy, fdo, names::OwnedBusName, proxy::{self, PropertyStream, SignalStream}, zvariant::{OwnedValue, Value}};
+use zbus::{Connection, Proxy, fdo, names::OwnedBusName, proxy::{self, PropertyChanged, PropertyStream, SignalStream}, zvariant::{OwnedValue, Value}};
 
 mod metadata;
 pub use metadata::Metadata;
 
 pub use crate::player::properties::{WritableProperty, Property, ControlWritableProperty};
-use crate::player::signals::Signal;
+use crate::{player::{signals::Signal, streams::ParsedPropertyStream}, properties::{PlaybackStatus, Rate}};
 
 pub mod properties;
 pub mod signals;
@@ -14,21 +14,13 @@ pub mod signals;
 mod enums;
 pub use enums::*;
 
+pub mod streams;
+
 // /// A stream that fires when some property of the player is changed, returning a message
 // pub struct PlayerStream<'a> {
 //     pub player: &'a Player,
     
 // }
-
-
-/// Returns the current position of the media of a [`Player`] every second, without polling the player.
-/// <br><br>Note: this doesn't take into account the length of the media, as it might not be provided (meaning the returned position could be longer than the length of the media).
-/// It only considers the current [playback status](Playback), the current [rate](properties::Rate), and if the Seeked signal was emmited, or the media changed
-// TODO_DOCS
-// pub struct PositionStream<> {
-
-// }
-
 
 
 /// A player that plays something, or not, who knowns...
@@ -143,14 +135,14 @@ impl Player {
     }
 
     /// Returns a stream that fires every time a property of some kind had been changed.
-    pub async fn property_changed_stream<'a, P>(&self, property: P) -> Result<PropertyStream<'_, P::ParseAs>, zbus::Error> 
+    pub async fn property_changed_stream<'a, P>(&self, property: P) -> Result<ParsedPropertyStream<'_, P>, zbus::Error> 
     where 
-        P: Property,
-        P::ParseAs: 'a + Into<Value<'a>>
+        P: Property + Unpin + 'static,
+        P::ParseAs: TryFrom<OwnedValue>
     {
         let proxy = self.proxy(property.interface())?;
-
-        Ok(proxy.receive_property_changed(property.name()).await)
+        let raw = proxy.receive_property_changed(property.name()).await;
+        Ok(ParsedPropertyStream::new(property, raw))
     }
 
     /// Subscribe to a dbus signal. Possible options: [`signals`]

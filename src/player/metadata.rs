@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use zbus::zvariant::OwnedValue;
+use zbus::zvariant::{ObjectPath, OwnedValue};
 
 /// Metadata of a media
 /// <br>It's construced from the [metadata specs](https://www.freedesktop.org/wiki/Specifications/mpris-spec/metadata/).
@@ -10,7 +10,7 @@ pub struct Metadata {
     // MPRIS specific things
 
     // TODO (probably)
-    /// A unique identity for this track within the context of an MPRIS object. This is always provided
+    /// A unique identity for this track within the context of an MPRIS object. This is always provided, but not always accurate (for example browsers might provide bullshit)
     pub trackid: String,
     /// The length of the track
     pub length: Option<Duration>,
@@ -106,3 +106,4 @@ impl From<HashMap<String, OwnedValue>> for Metadata {
         Self::new_from_hashmap(value)
     }
 }
+

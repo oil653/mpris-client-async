@@ -46,7 +46,7 @@ async fn main() {
         println!("\t\tcan_seek: {}",                    player.get(CanSeek).await.unwrap_or(false));
         println!("\t\tcan_control: {}",                 player.get(CanControl).await.unwrap_or(false));
 
-        // println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
+        println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
 
         // let can_control = player.get(CanControl).await.unwrap_or(false);
         // if can_control {
@@ -65,6 +65,7 @@ async fn main() {
 
         
         // Subscribe to the event when Metadata changed.
+        // let cigany: mpris_client_async::streams::ParsedPropertyStream<'_, Rate> = player.property_changed_stream(Metadata).await.unwrap();
         metadata_streams.push(player.property_changed_stream(Metadata).await.unwrap());
         seeked_signals.push(player.subscribe(Seeked).await.unwrap());
 
@@ -72,13 +73,10 @@ async fn main() {
     }
 
     // Combine the streams of the changes. YOU CANNOT KNOW WHICH PLAYER A MESSAGE IS FROM!
-    // let mut combined = select_all(metadata_streams);
-    // while let Some(value) = combined.next().await {
-    //     let raw = value.get().await.expect("Failed to get body of a signal change");
-    //     let parsed = METADATA.into_output(raw);
-
-    //     println!("Metadata changed for some player: {:#?}", parsed);
-    // }
+    let mut combined = select_all(metadata_streams);
+    while let Some(mtd) = combined.next().await {
+        println!("Metadata changed for some player: {:#?}", mtd);
+    }
 
 
     
