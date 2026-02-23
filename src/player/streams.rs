@@ -2,8 +2,9 @@ use std::{ops::Deref, pin::Pin, task::{Context, Poll}, time::Duration};
 
 use futures::Stream;
 use pin_project::pin_project;
+use serde::de::DeserializeOwned;
 use tokio::time::{Instant, Sleep};
-use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Value}};
+use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::OwnedValue};
 
 use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::Signal};
 
@@ -148,7 +149,7 @@ where
 pub struct ParsedSignalStream<'a, S>
 where 
     S: Signal + Unpin + 'static,
-    S::ParseAs: TryFrom<OwnedValue>
+    S::ParseAs: DeserializeOwned + Send + 'static
 {
     #[pin]
     raw_stream: SignalStream<'a>,
@@ -158,7 +159,7 @@ where
 impl<'a, S> ParsedSignalStream<'a, S>
 where
     S: Signal + Unpin + 'static,
-    S::ParseAs: TryFrom<OwnedValue>
+    S::ParseAs: DeserializeOwned + Send + 'static
 {
     pub fn new(signal: S, signal_stream: SignalStream<'a>) -> Self {
         Self { 
@@ -167,38 +168,32 @@ where
         }
     }
 }
-// impl<'a, S> Stream for ParsedSignalStream<'a, S> 
-// where 
-//     S: Signal + Unpin + 'static,
-//     S::ParseAs: TryFrom<OwnedValue>
-// {
-//     type Item = S::Output;
+impl<'a, S> Stream for ParsedSignalStream<'a, S> 
+where 
+    S: Signal + Unpin + 'static,
+    S::Output: Send + 'static,
+    S::ParseAs: DeserializeOwned + Send + 'static
+{
+    type Item = S::Output;
 
-//     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> 
-//     where 
-//         S::ParseAs: TryFrom<OwnedValue>,
-//         S::Output: Send + 'static
-//     {
-//         use Poll::*;
-//         let mut this = self.project();
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        use Poll::*;
+        let mut this = self.project();
 
-//         // Try to poll the raw stream, if something is changed, start polling what changed.
-//         match this.raw_stream.as_mut().poll_next(cx) {
-//             Pending => Pending,
-//             Ready(None) => Ready(None),  // The raw stream is finished, meaning this stream should finish too
-//             Ready(Some(value)) => {
-//                 let body = value.body();
-//                 let deser = body.deserialize::<S::ParseAs>();
-//                 let value: S::ParseAs = match deser {
-//                     Ok(value) => value,
-//                     Err(_e) => return Ready(None)
-//                 };
+        // Try to poll the raw stream, if something is changed, start polling what changed.
+        match this.raw_stream.as_mut().poll_next(cx) {
+            Pending => Pending,
+            Ready(None) => Ready(None),  // The raw stream is finished, meaning this stream should finish too
+            Ready(Some(msg)) => {
+                let body = msg.body();
+                let parsed: S::ParseAs = match body.deserialize() {
+                    Ok(v) => v,
+                    Err(_e) => return Ready(None)
+                };
 
-//                 Ready(Some(this.s.into_output(value)))
-                    
-                    
-//                 // let converted: S::ParseAs = value.try_into().map_err(|_e| zbus::Error::Variant(zbus::zvariant::Error::IncorrectType))?;
-//             }
-//         }
-//     }
-// }
+                Ready(Some(this.s.into_output(parsed)))
+                }
+        }
+    }
+}
+

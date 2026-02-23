@@ -13,7 +13,7 @@ use crate::player::enums::Interface;
 /// <br>Properties also may implement [WritableProperty], or [ControlWritableProperty] (but shouldn't implement both at the same time).
 pub trait Property : Debug {
     /// Parses form zbus's Value as this, with into_output transformations may be applied
-    type ParseAs: serde::de::DeserializeOwned + Send + 'static;
+    type ParseAs: serde::de::DeserializeOwned + Send + 'static + Clone;
 
     /// The output type of the property 
     type Output:  Send + 'static;
