@@ -3,10 +3,10 @@ use std::{ops::Deref, pin::Pin, task::{Context, Poll}, time::Duration};
 use futures::Stream;
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
-use tokio::time::{Instant, Sleep};
+use tokio::time::{Instant, Sleep, sleep, sleep_until};
 use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Type}};
 
-use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::Signal};
+use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::{Seeked, Signal}};
 
 
 /// Returns the current position of the media of a [`Player`] every second, without polling the player.
@@ -22,7 +22,7 @@ pub struct PositionStream<'a> {
     rate_stream: ParsedPropertyStream<'a, Rate>,
 
     #[pin]
-    seeked_stream: SignalStream<'a>,
+    seeked_stream: ParsedSignalStream<'a, Seeked>,
 
     #[pin]
     sleep: Sleep,
@@ -33,39 +33,96 @@ pub struct PositionStream<'a> {
     playback: Playback,
     position: Duration
 }
-// impl<'a> Stream for PositionStream<'a> {
-//     type Item = Duration;
+impl<'a> Stream for PositionStream<'a> {
+    type Item = Duration;
 
-//     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-//         use Poll::*;
-//         let mut this = self.project();
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        use Poll::*;
+        let mut this = self.project();
 
-//         // See if the playback status changed
-//         match this.playback_stream.as_mut().poll_next(cx) {
-//             // Playback state did not change
-//             Pending => {},
-//             // playback_stream finished, meaning this stream should finish too
-//             Ready(None) => return Ready(None),
-//             Ready(Some(new_playback)) => *this.playback = new_playback
-//         };
+        // Check if the rate changed
+        match this.rate_stream.as_mut().poll_next(cx) {
+            // Nothing changed
+            Pending => {},
+            Ready(None) => return Ready(None),
+            Ready(Some(new_rate)) => {
+                let old_rate = *this.rate;
+                *this.rate = new_rate;
 
-//         // Check if the rate changed
-//         match this.rate_stream.as_mut().poll_next(cx) {
-//             // Nothing changed
-//             Pending => {},
-//             Ready(None) => return Ready(None),
-//             Ready(Some(new_rate)) => *this.rate = new_rate
-//         }
+                if *this.playback == Playback::Playing {
+                    // How much time passsed since the last tick
+                    let delta = Instant::now() - *this.last_tick;
+                    let new_position = Duration::from_micros(((*this.position + delta).as_micros() as f64 * old_rate) as u64);
 
-//         match this.seeked_stream.as_mut().poll_next(cx) {
-//             Pending => {},
-//             Ready(None) => return Ready(None),
-//             Ready(Some(new))
-//         }
+                    this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
 
-//         Pending
-//     }
-// }
+                    *this.last_tick = Instant::now();
+                    *this.position = new_position;
+
+                    return Ready(Some(new_position));
+                }
+            }
+        }
+
+        // See if the playback status changed
+        match this.playback_stream.as_mut().poll_next(cx) {
+            // Playback state did not change
+            Pending => {},
+            // playback_stream finished, meaning this stream should finish too
+            Ready(None) => return Ready(None),
+            Ready(Some(new_playback)) => {
+                let old_playback = *this.playback;
+                *this.playback = new_playback;
+
+                this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
+
+                match (old_playback, *this.playback) {
+                    (Playback::Paused | Playback::Stopped, Playback::Playing) => {
+                        *this.last_tick = Instant::now();
+                        return Ready(Some(*this.position))
+                    },
+                    (Playback::Playing, Playback::Paused | Playback::Stopped) => {
+                        let delta = Instant::now() - *this.last_tick;
+                        *this.position = Duration::from_micros(((*this.position + delta).as_micros() as f64 * *this.rate) as u64);
+                        *this.last_tick = Instant::now();
+
+                        return Ready(Some(*this.position));
+                    },
+                    _ => {}
+                }
+            }
+        };
+
+        match this.seeked_stream.as_mut().poll_next(cx) {
+            Pending => {},
+            Ready(None) => return Ready(None),
+            Ready(Some(new)) => {
+                *this.position = new;
+                *this.last_tick = Instant::now();
+
+                // Set next sleep cycle
+                this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
+
+                return Ready(Some(new))
+            }
+        }
+
+        match this.sleep.as_mut().poll(cx) {
+            Pending => Pending,
+            Ready(_) => {
+                let delta = Instant::now() - *this.last_tick;
+                let new_position = Duration::from_micros(((*this.position + delta).as_micros() as f64 * *this.rate) as u64);
+
+                *this.position = new_position;
+                *this.last_tick = Instant::now();
+
+                this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
+
+                Ready(Some(*this.position))
+            }
+        }
+    }
+}
 
 
 #[pin_project]
