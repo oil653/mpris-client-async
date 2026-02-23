@@ -73,19 +73,16 @@ async fn main() {
     }
 
     // Combine the streams of the changes. YOU CANNOT KNOW WHICH PLAYER A MESSAGE IS FROM!
-    let mut combined = select_all(metadata_streams);
-    while let Some(mtd) = combined.next().await {
-        println!("Metadata changed for some player: {:#?}", mtd);
-    }
+    // let mut combined = select_all(metadata_streams);
+    // while let Some(mtd) = combined.next().await {
+    //     println!("Metadata changed for some player: {:#?}", mtd);
+    // }
 
 
     
     // Listen for seeked signals (wont know which player it is from, as they're combined)
     // let mut combined = select_all(seeked_signals);
     // while let Some(seeked_to) = combined.next().await {
-    //     let raw: i64 = seeked_to.body().deserialize::<i64>().expect("Failed to deseralize signal message body");
-    //     let parsed = SEEKED.into_output(raw);
-
-    //     println!("Some player seeked to: {}", parsed.as_secs());
+    //     println!("Some player seeked to: {}", seeked_to.as_secs());
     // }
 }

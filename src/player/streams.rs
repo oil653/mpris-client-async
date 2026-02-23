@@ -4,7 +4,7 @@ use futures::Stream;
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use tokio::time::{Instant, Sleep};
-use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::OwnedValue};
+use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Type}};
 
 use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::Signal};
 
@@ -148,7 +148,7 @@ where
 /// A [`SignalStream`], but the raw data is parsed into the corresponding [`Signal`](super::signals::Signal) type
 pub struct ParsedSignalStream<'a, S>
 where 
-    S: Signal + Unpin + 'static,
+    S: Signal + 'static,
     S::ParseAs: DeserializeOwned + Send + 'static
 {
     #[pin]
@@ -158,7 +158,7 @@ where
 }
 impl<'a, S> ParsedSignalStream<'a, S>
 where
-    S: Signal + Unpin + 'static,
+    S: Signal + 'static,
     S::ParseAs: DeserializeOwned + Send + 'static
 {
     pub fn new(signal: S, signal_stream: SignalStream<'a>) -> Self {
@@ -170,9 +170,9 @@ where
 }
 impl<'a, S> Stream for ParsedSignalStream<'a, S> 
 where 
-    S: Signal + Unpin + 'static,
+    S: Signal + 'static,
     S::Output: Send + 'static,
-    S::ParseAs: DeserializeOwned + Send + 'static
+    S::ParseAs: DeserializeOwned + Send + 'static + Type
 {
     type Item = S::Output;
 
@@ -186,7 +186,7 @@ where
             Ready(None) => Ready(None),  // The raw stream is finished, meaning this stream should finish too
             Ready(Some(msg)) => {
                 let body = msg.body();
-                let parsed: S::ParseAs = match body.deserialize() {
+                let parsed: S::ParseAs = match body.deserialize_unchecked() {   // Lets hope unchecked is fine
                     Ok(v) => v,
                     Err(_e) => return Ready(None)
                 };

@@ -6,7 +6,7 @@ mod metadata;
 pub use metadata::Metadata;
 
 pub use crate::player::properties::{WritableProperty, Property, ControlWritableProperty};
-use crate::{player::{signals::Signal, streams::ParsedPropertyStream}, properties::{PlaybackStatus, Rate}};
+use crate::{player::{signals::Signal, streams::ParsedPropertyStream}, properties::{PlaybackStatus, Rate}, streams::ParsedSignalStream};
 
 pub mod properties;
 pub mod signals;
@@ -135,7 +135,7 @@ impl Player {
     }
 
     /// Returns a stream that fires every time a property of some kind had been changed.
-    pub async fn property_changed_stream<'a, P>(&self, property: P) -> Result<ParsedPropertyStream<'_, P>, zbus::Error> 
+    pub async fn property_changed_stream<P>(&self, property: P) -> Result<ParsedPropertyStream<'_, P>, zbus::Error> 
     where 
         P: Property + Unpin + 'static,
         P::ParseAs: TryFrom<OwnedValue>
@@ -145,15 +145,16 @@ impl Player {
         Ok(ParsedPropertyStream::new(property, raw))
     }
 
-    /// Subscribe to a dbus signal. Possible options: [`signals`]
-    pub async fn subscribe<'a, S>(&self, signal: S) -> Result<SignalStream<'_>, zbus::Error> 
-    where 
-        S: Signal,
-        S::ParseAs: 'a + Into<Value<'a>>
+    /// Subscribe to a D-Bus signal. Possible options: [`signals`]
+    pub async fn subscribe<S>(&self, signal: S) -> Result<ParsedSignalStream<'_, S>, zbus::Error>
+    where
+        S: Signal + Unpin + 'static,
+        S::ParseAs: TryFrom<OwnedValue>
     {
         let proxy = self.proxy(signal.interface())?;
+        let raw = proxy.receive_signal(signal.name()).await?;
 
-        Ok(proxy.receive_signal(signal.name()).await?)
+        Ok(ParsedSignalStream::new(signal, raw))
     }
     
 
