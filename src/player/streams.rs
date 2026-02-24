@@ -1,3 +1,6 @@
+//! Provides a few useful streams to make working with a [`Player`](super::Player) easier
+
+
 use std::{ops::Deref, pin::Pin, task::{Context, Poll}, time::Duration};
 
 use futures::Stream;
@@ -9,10 +12,8 @@ use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Type}};
 use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::{Seeked, Signal}};
 
 
-/// Returns the current position of the media of a [`Player`] every second, without polling the player.
-/// <br><br>Note: this doesn't take into account the length of the media, as it might not be provided (meaning the returned position could be longer than the length of the media).
-/// It only considers the current [playback status](Playback), the current [rate](properties::Rate), and if the Seeked signal was emmited, or the media changed
-// TODO_DOCS
+/// Returns the current position of the media of a [`Player`](super::Player) every second, without polling the player.
+/// <br><br>Note: this doesn't take into account the length of the media, as it might not be provided, thus the returned position could be longer than the length of the media.
 #[pin_project]
 pub struct PositionStream<'a> {
     #[pin]
@@ -156,8 +157,10 @@ impl<'a> Stream for PositionStream<'a> {
 
 
 #[pin_project]
-/// A [`PropertyStream`], but the raw data is parsed into the corresponding [`Property`](super::properties::Property) type.
+/// A [`PropertyStream`](https://docs.rs/zbus/latest/zbus/proxy/struct.PropertyStream.html), but the raw data is parsed into the corresponding [`Property`](super::properties::Property) type.
 /// <br>Note: The first time the stream is polled it will return the <b>current</b> state.
+/// 
+/// <br>For signals check out [`ParsedSignalStream`]
 pub struct ParsedPropertyStream<'a, P>
 where 
     P: Property + Unpin + 'static,
@@ -239,7 +242,9 @@ where
 
 
 #[pin_project]
-/// A [`SignalStream`], but the raw data is parsed into the corresponding [`Signal`](super::signals::Signal) type
+/// A [`SignalStream`](https://docs.rs/zbus/latest/zbus/proxy/struct.SignalStream.html), but the raw data is parsed into the corresponding [`Signal`](super::signals::Signal) type.
+/// 
+/// <br>For properties check out [`ParsedPropertyStream`]
 pub struct ParsedSignalStream<'a, S>
 where 
     S: Signal + 'static,
