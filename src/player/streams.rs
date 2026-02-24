@@ -126,7 +126,8 @@ impl<'a> Stream for PositionStream<'a> {
 
 
 #[pin_project]
-/// A [`PropertyStream`], but the raw data is parsed into the corresponding [`Property`](super::properties::Property) type
+/// A [`PropertyStream`], but the raw data is parsed into the corresponding [`Property`](super::properties::Property) type.
+/// <br>Note: The first time the stream is polled it will return the <b>current</b> state.
 pub struct ParsedPropertyStream<'a, P>
 where 
     P: Property + Unpin + 'static,
@@ -167,33 +168,39 @@ where
         use Poll::*;
         let mut this = self.project();
 
-        if let Some(fut) = this.pending.as_mut().as_pin_mut() {
-            match fut.poll(cx) {
-                Pending => return Pending,
-                Ready(Ok(result)) => {
-                    let parsed: P::Output = this.p.into_output(result);
-                    return Ready(Some(parsed))
-                },
-                Ready(Err(_e)) => {
-                    return Ready(None)
+        loop {
+            if let Some(fut) = this.pending.as_mut().as_pin_mut() {
+                match fut.poll(cx) {
+                    Pending => return Pending,
+                    Ready(Ok(result)) => {
+                        let parsed: P::Output = this.p.into_output(result);
+                        this.pending.set(None);
+
+                        return Ready(Some(parsed))
+                    },
+                    Ready(Err(_e)) => {
+                        this.pending.set(None);
+                        return Ready(None)
+                    }
                 }
             }
-        }
 
-        // Try to poll the raw stream, if something is changed, start polling what changed.
-        match this.raw_stream.as_mut().poll_next(cx) {
-            Pending => Pending,
-            Ready(None) => Ready(None),  // The raw stream is finished, meaning this stream should finish too
-            Ready(Some(value)) => {
-                // If something has changed, create a future that can be polled, to get what changed, and return Pending
-                let fut: Pin<Box<dyn Future<Output = Result<P::ParseAs, zbus::Error>>>> = Box::pin(async move {
-                    // It is safe to unwrap, as it could only fail on UNIX platforms, if Value::Fd is being parsed
-                    let value: OwnedValue = value.get_raw().await?.deref().clone().try_into_owned().unwrap();
-                    let converted: P::ParseAs = value.try_into().map_err(|_e| zbus::Error::Variant(zbus::zvariant::Error::IncorrectType))?;
-                    Ok(converted)
-                });
-                *this.pending = Some(fut);
-                Pending
+
+            // Try to poll the raw stream, if something is changed, start polling what changed.
+            match this.raw_stream.as_mut().poll_next(cx) {
+                Pending => return Pending,
+                Ready(None) => return Ready(None),  // The raw stream is finished, meaning this stream should finish too
+                Ready(Some(value)) => {
+
+                    // If something has changed, create a future that can be polled, to get what changed, and return Pending
+                    let fut: Pin<Box<dyn Future<Output = Result<P::ParseAs, zbus::Error>>>> = Box::pin(async move {
+                        // It is safe to unwrap, as it could only fail on UNIX platforms, if Value::Fd is being parsed
+                        let value: OwnedValue = value.get_raw().await?.deref().clone().try_into_owned().unwrap();
+                        let converted: P::ParseAs = value.try_into().map_err(|_e| zbus::Error::Variant(zbus::zvariant::Error::IncorrectType))?;
+                        Ok(converted)
+                    });
+                    *this.pending = Some(fut);
+                }
             }
         }
     }
