@@ -2,32 +2,51 @@ use std::sync::Arc;
 
 use futures::future::join_all;
 
-use zbus::Connection;
+use zbus::{Connection, fdo::DBusProxy};
 
 use crate::Player;
 
 #[derive(Debug, Clone)]
 /// Provides a convenient way to connect to the dbus and retrieve the MPRIS players.
-pub struct Mpris {
+pub struct Mpris<'a> {
     connection: Connection,
+    proxy: DBusProxy<'a>
 }
 
-impl Mpris {
+impl<'a> Mpris<'a> {
     /// Creates a new connection
     pub async fn new() -> Result<Self, zbus::Error> {
         let connection = Connection::session().await?;
+        let proxy = zbus::fdo::DBusProxy::new(&connection).await?;
 
         Ok(
             Self {
-                connection: connection
+                connection,
+                proxy
             }
         )
     }
 
+    /// Creates a new instance from an already existing connection
+    pub async fn new_from_connection(connection: Connection) -> Result<Self, zbus::Error> {
+        let proxy = zbus::fdo::DBusProxy::new(&connection).await?;
+
+        Ok(
+            Self {
+                connection,
+                proxy
+            }
+        )
+    }
+
+    /// Returns a copy of the underlying connection
+    pub fn connection(&self) -> Connection {
+        self.connection.clone()
+    }
+
     /// Gets all currently available players.
     pub async fn get_players(&self) -> Result<Vec<Arc<Player>>, zbus::Error> {
-        let proxy = zbus::fdo::DBusProxy::new(&self.connection).await?;
-        let names = proxy.list_names().await?;
+        let names = self.proxy.list_names().await?;
 
         Ok (
             join_all(names   
