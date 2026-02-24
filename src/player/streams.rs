@@ -3,7 +3,7 @@ use std::{ops::Deref, pin::Pin, task::{Context, Poll}, time::Duration};
 use futures::Stream;
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
-use tokio::time::{Instant, Sleep, sleep, sleep_until};
+use tokio::time::{Instant, Sleep, sleep_until};
 use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Type}};
 
 use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::{Seeked, Signal}};
@@ -33,12 +33,35 @@ pub struct PositionStream<'a> {
     playback: Playback,
     position: Duration
 }
+impl<'a> PositionStream<'a> {
+    pub fn new(
+        playback_stream: ParsedPropertyStream<'a, PlaybackStatus>,
+        initial_playback: Playback,
+        rate_stream: ParsedPropertyStream<'a, Rate>,
+        initial_rate: f64,
+        seeked_stream: ParsedSignalStream<'a, Seeked>,
+        initial_position: Duration
+    ) -> Self {
+        Self { 
+            playback_stream, 
+            rate_stream, 
+            seeked_stream, 
+            sleep: Sleep::from(sleep_until(Instant::now())), // The stream be called instantly when the first poll happens
+            last_tick: Instant::now(),
+            rate: initial_rate, 
+            playback: initial_playback, 
+            position: initial_position 
+        }
+    }
+}
 impl<'a> Stream for PositionStream<'a> {
     type Item = Duration;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         use Poll::*;
         let mut this = self.project();
+
+        println!("Playback is {}", *this.playback);
 
         // Check if the rate changed
         match this.rate_stream.as_mut().poll_next(cx) {
@@ -52,7 +75,7 @@ impl<'a> Stream for PositionStream<'a> {
                 if *this.playback == Playback::Playing {
                     // How much time passsed since the last tick
                     let delta = Instant::now() - *this.last_tick;
-                    let new_position = Duration::from_micros(((*this.position + delta).as_micros() as f64 * old_rate) as u64);
+                    let new_position = Duration::from_micros((this.position.as_micros() as f64 + (delta.as_micros() as f64 * old_rate)) as u64);
 
                     this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
 
@@ -110,10 +133,17 @@ impl<'a> Stream for PositionStream<'a> {
         match this.sleep.as_mut().poll(cx) {
             Pending => Pending,
             Ready(_) => {
-                let delta = Instant::now() - *this.last_tick;
-                let new_position = Duration::from_micros(((*this.position + delta).as_micros() as f64 * *this.rate) as u64);
+                match *this.playback {
+                    Playback::Playing => {
+                        let delta = Instant::now() - *this.last_tick;
+                        let new_position = Duration::from_micros((this.position.as_micros() as f64 + (delta.as_micros() as f64 * *this.rate)) as u64);
 
-                *this.position = new_position;
+                        *this.position = new_position;
+                    },
+                    Playback::Stopped => *this.position = Duration::from_secs(0),
+                    _ => {}
+                }
+
                 *this.last_tick = Instant::now();
 
                 this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));

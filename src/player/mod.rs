@@ -6,7 +6,7 @@ mod metadata;
 pub use metadata::Metadata;
 
 pub use crate::player::properties::{WritableProperty, Property, ControlWritableProperty};
-use crate::{player::{signals::Signal, streams::ParsedPropertyStream}, properties::{PlaybackStatus, Rate}, streams::ParsedSignalStream};
+use crate::{player::{signals::Signal, streams::ParsedPropertyStream}, properties::{PlaybackStatus, Position, Rate}, signals::Seeked, streams::{ParsedSignalStream, PositionStream}};
 
 pub mod properties;
 pub mod signals;
@@ -135,7 +135,7 @@ impl Player {
     }
 
     /// Returns a stream that fires every time a property of some kind had been changed.
-    pub async fn property_changed_stream<P>(&self, property: P) -> Result<ParsedPropertyStream<'_, P>, zbus::Error> 
+    pub async fn subscribe_property_change<P>(&self, property: P) -> Result<ParsedPropertyStream<'_, P>, zbus::Error> 
     where 
         P: Property + Unpin + 'static,
         P::ParseAs: TryFrom<OwnedValue>
@@ -155,6 +155,21 @@ impl Player {
         let raw = proxy.receive_signal(signal.name()).await?;
 
         Ok(ParsedSignalStream::new(signal, raw))
+    }
+
+
+    /// Returns a [`PositionStream`] that yields the current (esitmated) position of the media playback (by listening to the signal, and property changes emitted by dbus).
+    pub async fn subscribe_position(&self) -> Result<PositionStream<'_>, zbus::Error> {
+        Ok(
+            PositionStream::new(
+                self.subscribe_property_change(PlaybackStatus).await?, 
+                self.get(PlaybackStatus).await?,
+                self.subscribe_property_change(Rate).await?,
+                self.get(Rate).await?,
+                self.subscribe(Seeked).await?, 
+                self.get(Position).await?,
+            )
+        )
     }
     
 

@@ -1,7 +1,7 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, pin::Pin, time::Duration};
 
 use futures::{StreamExt, stream::select_all};
-use mpris_client_async::{Loop, Mpris, properties::*, signals::{SEEKED, Seeked, Signal}};
+use mpris_client_async::{Loop, Mpris, properties::*, signals::{SEEKED, Seeked, Signal}, streams::PositionStream};
 use zbus::zvariant::OwnedValue;
 
 #[tokio::main]
@@ -11,6 +11,7 @@ async fn main() {
     
     let mut metadata_streams= Vec::new();
     let mut seeked_signals = Vec::new();
+    let mut position_change: Option<Pin<Box<PositionStream>>>  = None;
 
     // Get the "unique name" of the players
     for player in &players {
@@ -66,17 +67,22 @@ async fn main() {
         
         // Subscribe to the event when Metadata changed.
         // let cigany: mpris_client_async::streams::ParsedPropertyStream<'_, Rate> = player.property_changed_stream(Metadata).await.unwrap();
-        metadata_streams.push(player.property_changed_stream(PlaybackStatus).await.unwrap());
+        metadata_streams.push(player.subscribe_property_change(PlaybackStatus).await.unwrap());
         seeked_signals.push(player.subscribe(Seeked).await.unwrap());
+        
+        
+        if position_change.is_none() {
+            position_change = Some(Box::pin(player.subscribe_position().await.unwrap()))
+        }
 
         println!();
     }
 
     // Combine the streams of the changes. YOU CANNOT KNOW WHICH PLAYER A MESSAGE IS FROM!
-    let mut combined = select_all(metadata_streams);
-    while let Some(mtd) = combined.next().await {
-        println!("Metadata changed for some player: {:#?}", mtd);
-    }
+    // let mut combined = select_all(metadata_streams);
+    // while let Some(mtd) = combined.next().await {
+    //     println!("Playback for some player changed to: {:#?}", mtd);
+    // }
 
 
     
@@ -85,4 +91,10 @@ async fn main() {
     // while let Some(seeked_to) = combined.next().await {
     //     println!("Some player seeked to: {}", seeked_to.as_secs());
     // }
+
+    // Print the changes of the media playback (estimated) position of the first player
+    let mut pos_change = position_change.unwrap();
+    while let Some(pos) = pos_change.next().await {
+        println!("A player changed position to: {}", pos.as_secs())
+    }
 }
