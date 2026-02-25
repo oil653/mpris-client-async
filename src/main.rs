@@ -1,8 +1,7 @@
 use std::{collections::HashMap, pin::Pin, time::Duration};
 
-use futures::{StreamExt, stream::{Concat, select_all}};
+use futures::{StreamExt, pin_mut, stream::{Concat, select_all}};
 use mpris_client_async::{Loop, Mpris, PlayerEvent, properties::*, signals::{SEEKED, Seeked, Signal}, streams::PositionStream};
-use zbus::zvariant::OwnedValue;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +20,7 @@ async fn main() {
             player.get(DesktopEntry).await.unwrap_or("??".to_string())
         );
 
-        // println!("Player identity: {}", player.get::<properties::Identity>().await.unwrap_or("Freak"));
+        println!("Player identity: {}", player.get(Identity).await.unwrap_or(String::from("??")));
 
         println!("\tMediaPlayer2:");
         println!("\t\tCapabilities:");
@@ -98,7 +97,9 @@ async fn main() {
     //     println!("A player changed position to: {}", pos.as_secs())
     // }
 
-    let mut player_stream = Box::pin(mpris.player_stream().await.expect("Failed to subscribe to player_stream"));
+    // Listen and print if a new device connects or disconnects
+    let player_stream = mpris.player_stream().await.expect("Failed to subscribe to player_stream");
+    pin_mut!(player_stream);
     while let Some(event) = player_stream.next().await {
         match event {
             PlayerEvent::Connected(player) => println!("New player connected with name: {}", player.dbus_name().to_string()),
