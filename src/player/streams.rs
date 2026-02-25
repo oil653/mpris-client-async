@@ -62,8 +62,6 @@ impl<'a> Stream for PositionStream<'a> {
         use Poll::*;
         let mut this = self.project();
 
-        println!("Playback is {}", *this.playback);
-
         // Check if the rate changed
         match this.rate_stream.as_mut().poll_next(cx) {
             // Nothing changed

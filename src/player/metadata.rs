@@ -15,7 +15,7 @@ pub struct Metadata {
     /// The length of the track
     pub length: Option<Duration>,
     /// The URI of the location of the track. You should not assume this will exist when a new track is played. 
-    /// <br>Local files will start "file://"
+    /// <br>Local files will start "file://", but it can be an online URL as well (for example Spotify's desktop player provides a URL).
     pub art_url: Option<String>,
 
     // XESAM fields

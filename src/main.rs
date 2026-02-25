@@ -47,7 +47,7 @@ async fn main() {
         println!("\t\tcan_seek: {}",                    player.get(CanSeek).await.unwrap_or(false));
         println!("\t\tcan_control: {}",                 player.get(CanControl).await.unwrap_or(false));
 
-        // println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
+        println!("\t\t\tMetadata: {:#?}",               player.get(Metadata).await);
 
         // let can_control = player.get(CanControl).await.unwrap_or(false);
         // if can_control {
