@@ -16,12 +16,6 @@ pub use enums::*;
 
 pub mod streams;
 
-// /// A stream that fires when some property of the player is changed, returning a message
-// pub struct PlayerStream<'a> {
-//     pub player: &'a Player,
-    
-// }
-
 
 /// A player that plays something, or not, who knowns...
 #[derive(Debug, Clone)]
@@ -73,8 +67,8 @@ impl Player {
 
     /// Returns the ["unique name"](https://z-galaxy.github.io/zbus/concepts.html#bus-name--service-name) of the player.
     /// <br><br>For example `org.mpris.MediaPlayer2.vlc`
-    pub fn dbus_name(&self) -> String {
-        self.name.to_string()
+    pub fn dbus_name(&self) -> OwnedBusName {
+        self.name.clone()
     }
 
     fn proxy(&self, interface: Interface) -> Result<&Proxy<'static>, zbus::Error> {

@@ -6,11 +6,14 @@ use zbus::{Connection, fdo::DBusProxy};
 
 use crate::Player;
 
+mod player_stream;
+pub use player_stream::PlayerEvent;
+
 #[derive(Debug, Clone)]
 /// Provides a convenient way to connect to the dbus and retrieve the MPRIS players.
 pub struct Mpris<'a> {
     connection: Connection,
-    proxy: DBusProxy<'a>
+    pub(crate) proxy: DBusProxy<'a>
 }
 
 impl<'a> Mpris<'a> {

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, pin::Pin, time::Duration};
 
-use futures::{StreamExt, stream::select_all};
-use mpris_client_async::{Loop, Mpris, properties::*, signals::{SEEKED, Seeked, Signal}, streams::PositionStream};
+use futures::{StreamExt, stream::{Concat, select_all}};
+use mpris_client_async::{Loop, Mpris, PlayerEvent, properties::*, signals::{SEEKED, Seeked, Signal}, streams::PositionStream};
 use zbus::zvariant::OwnedValue;
 
 #[tokio::main]
@@ -93,8 +93,16 @@ async fn main() {
     // }
 
     // Print the changes of the media playback (estimated) position of the first player
-    let mut pos_change = position_change.unwrap();
-    while let Some(pos) = pos_change.next().await {
-        println!("A player changed position to: {}", pos.as_secs())
+    // let mut pos_change = position_change.unwrap();
+    // while let Some(pos) = pos_change.next().await {
+    //     println!("A player changed position to: {}", pos.as_secs())
+    // }
+
+    let mut player_stream = Box::pin(mpris.player_stream().await.expect("Failed to subscribe to player_stream"));
+    while let Some(event) = player_stream.next().await {
+        match event {
+            PlayerEvent::Connected(player) => println!("New player connected with name: {}", player.dbus_name().to_string()),
+            PlayerEvent::Disconnected(player) => println!("Player disconnected with name: {}", player.dbus_name().to_string())
+        }
     }
 }

@@ -11,4 +11,4 @@ pub use player::{
 };
 
 mod mpris;
-pub use mpris::Mpris;
+pub use mpris::{ Mpris, PlayerEvent };
