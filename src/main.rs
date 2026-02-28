@@ -66,10 +66,10 @@ async fn main() {
         
         // Subscribe to the event when Metadata changed.
         // let cigany: mpris_client_async::streams::ParsedPropertyStream<'_, Rate> = player.property_changed_stream(Metadata).await.unwrap();
-        playback_streams.push(player.subscribe_property_change(PlaybackStatus).await.unwrap());
-        seeked_signals.push(player.subscribe(Seeked).await.unwrap());
+        playback_streams.push(player.clone().subscribe_property_change(PlaybackStatus).await.unwrap());
+        seeked_signals.push(player.clone().subscribe(Seeked).await.unwrap());
 
-        pos_changes.push(Box::pin(player.subscribe_position().await.unwrap()));
+        pos_changes.push(Box::pin(player.clone().subscribe_position().await.unwrap()));
 
         println!();
     }

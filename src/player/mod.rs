@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use zbus::{Connection, Proxy, fdo, names::OwnedBusName, proxy, zvariant::{OwnedValue, Value}};
 
@@ -135,7 +135,7 @@ impl Player {
     }
 
     /// Returns a stream that fires every time a property of some kind had been changed.
-    pub async fn subscribe_property_change<P>(&self, property: P) -> Result<ParsedPropertyStream<'_, P>, zbus::Error> 
+    pub async fn subscribe_property_change<'a, P>(self: Arc<Self>, property: P) -> Result<ParsedPropertyStream<'a, P>, zbus::Error> 
     where 
         P: Property + Unpin + 'static,
         P::ParseAs: TryFrom<OwnedValue>
@@ -146,7 +146,7 @@ impl Player {
     }
 
     /// Subscribe to a D-Bus signal. Possible options: [`signals`]
-    pub async fn subscribe<S>(&self, signal: S) -> Result<ParsedSignalStream<'_, S>, zbus::Error>
+    pub async fn subscribe<'a, S>(self: Arc<Self>, signal: S) -> Result<ParsedSignalStream<'a, S>, zbus::Error>
     where
         S: Signal + Unpin + 'static,
         S::ParseAs: TryFrom<OwnedValue>
@@ -163,15 +163,15 @@ impl Player {
     /// to determine the position of the playback.
     /// 
     /// <br><br>This SHOULD be prefered over repetitively calling [`get`](Self::get), as this is much more lighter.
-    pub async fn subscribe_position(&self) -> Result<PositionStream<'_>, zbus::Error> {
+    pub async fn subscribe_position<'a, 'b>(self: Arc<Self>) -> Result<PositionStream<'a>, zbus::Error> {
         Ok(
             PositionStream::new(
                 self.dbus_name(),
-                self.subscribe_property_change(PlaybackStatus).await?, 
+                self.clone().subscribe_property_change(PlaybackStatus).await?, 
                 self.get(PlaybackStatus).await?,
-                self.subscribe_property_change(Rate).await?,
+                self.clone().subscribe_property_change(Rate).await?,
                 self.get(Rate).await?,
-                self.subscribe(Seeked).await?, 
+                self.clone().subscribe(Seeked).await?,
                 self.get(Position).await?,
             )
         )
