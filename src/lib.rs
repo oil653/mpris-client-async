@@ -12,3 +12,5 @@ pub use player::{
 
 mod mpris;
 pub use mpris::{ Mpris, PlayerEvent };
+
+pub use zbus::Error;

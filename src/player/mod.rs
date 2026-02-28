@@ -33,6 +33,12 @@ pub struct Player {
     /// A proxy to "org.mpris.MediaPlayer2.Playlists"
     playlists_proxy: Option<Proxy<'static>>
 }
+impl PartialEq for Player {
+    // Two players are the same, if their dbus unique names are the same
+    fn eq(&self, other: &Self) -> bool {
+        self.dbus_name() == other.dbus_name()
+    }
+}
 impl Player {
     async fn create_proxy(connection: &Connection, name: &OwnedBusName, iface: Interface) -> Result<Proxy<'static>, zbus::Error> {
         Ok(
