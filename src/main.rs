@@ -1,16 +1,16 @@
-use std::{collections::HashMap, pin::Pin, time::Duration};
+use std::{pin::Pin, time::Duration};
 
-use futures::{StreamExt, pin_mut, stream::{Concat, select_all}};
-use mpris_client_async::{Loop, Mpris, PlayerEvent, properties::*, signals::{SEEKED, Seeked, Signal}, streams::PositionStream};
+use futures::{StreamExt, pin_mut, stream::select_all};
+use mpris_client_async::{Loop, Mpris, PlayerEvent, properties::*, signals::Seeked, streams::PositionStream};
 
 #[tokio::main]
 async fn main() {
     let mpris: Mpris = Mpris::new().await.unwrap();
     let players = mpris.get_players().await.unwrap();
     
-    let mut metadata_streams= Vec::new();
+    let mut playback_streams= Vec::new();
     let mut seeked_signals = Vec::new();
-    let mut position_change: Option<Pin<Box<PositionStream>>>  = None;
+    let mut pos_changes: Vec<Pin<Box<PositionStream>>>  = vec![];
 
     // Get the "unique name" of the players
     for player in &players {
@@ -66,21 +66,18 @@ async fn main() {
         
         // Subscribe to the event when Metadata changed.
         // let cigany: mpris_client_async::streams::ParsedPropertyStream<'_, Rate> = player.property_changed_stream(Metadata).await.unwrap();
-        metadata_streams.push(player.subscribe_property_change(PlaybackStatus).await.unwrap());
+        playback_streams.push(player.subscribe_property_change(PlaybackStatus).await.unwrap());
         seeked_signals.push(player.subscribe(Seeked).await.unwrap());
-        
-        
-        if position_change.is_none() {
-            position_change = Some(Box::pin(player.subscribe_position().await.unwrap()))
-        }
+
+        pos_changes.push(Box::pin(player.subscribe_position().await.unwrap()));
 
         println!();
     }
 
     // Combine the streams of the changes. YOU CANNOT KNOW WHICH PLAYER A MESSAGE IS FROM!
-    // let mut combined = select_all(metadata_streams);
-    // while let Some(mtd) = combined.next().await {
-    //     println!("Playback for some player changed to: {:#?}", mtd);
+    // let mut combined = select_all(playback_streams);
+    // while let Some(new) = combined.next().await {
+    //     println!("Playback for \"{}\" changed to: {}", new.player_name, new.value);
     // }
 
 
@@ -88,22 +85,22 @@ async fn main() {
     // Listen for seeked signals (wont know which player it is from, as they're combined)
     // let mut combined = select_all(seeked_signals);
     // while let Some(seeked_to) = combined.next().await {
-    //     println!("Some player seeked to: {}", seeked_to.as_secs());
+    //     println!("Player \"{}\" seeked to: {}", seeked_to.player_name, seeked_to.value.as_secs());
     // }
 
     // Print the changes of the media playback (estimated) position of the first player
-    // let mut pos_change = position_change.unwrap();
-    // while let Some(pos) = pos_change.next().await {
-    //     println!("A player changed position to: {}", pos.as_secs())
-    // }
+    let mut combined = select_all(pos_changes);
+    while let Some(pos) = combined.next().await {
+        println!("Player \"{}\" changed position to: {}", pos.player_name, pos.value.as_secs())
+    }
 
     // Listen and print if a new device connects or disconnects
-    let player_stream = mpris.player_stream().await.expect("Failed to subscribe to player_stream");
-    pin_mut!(player_stream);
-    while let Some(event) = player_stream.next().await {
-        match event {
-            PlayerEvent::Connected(player) => println!("New player connected with name: {}", player.dbus_name().to_string()),
-            PlayerEvent::Disconnected(player) => println!("Player disconnected with name: {}", player.dbus_name().to_string())
-        }
-    }
+    // let player_stream = mpris.player_stream().await.expect("Failed to subscribe to player_stream");
+    // pin_mut!(player_stream);
+    // while let Some(event) = player_stream.next().await {
+    //     match event {
+    //         PlayerEvent::Connected(player) => println!("New player connected with name: {}", player.dbus_name().to_string()),
+    //         PlayerEvent::Disconnected(player) => println!("Player disconnected with name: {}", player.dbus_name().to_string())
+    //     }
+    // }
 }

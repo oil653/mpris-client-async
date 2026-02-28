@@ -142,7 +142,7 @@ impl Player {
     {
         let proxy = self.proxy(property.interface())?;
         let raw = proxy.receive_property_changed(property.name()).await;
-        Ok(ParsedPropertyStream::new(property, raw))
+        Ok(ParsedPropertyStream::new(property, self.dbus_name(), raw))
     }
 
     /// Subscribe to a D-Bus signal. Possible options: [`signals`]
@@ -154,7 +154,7 @@ impl Player {
         let proxy = self.proxy(signal.interface())?;
         let raw = proxy.receive_signal(signal.name()).await?;
 
-        Ok(ParsedSignalStream::new(signal, raw))
+        Ok(ParsedSignalStream::new(signal, self.dbus_name(), raw))
     }
 
 
@@ -166,6 +166,7 @@ impl Player {
     pub async fn subscribe_position(&self) -> Result<PositionStream<'_>, zbus::Error> {
         Ok(
             PositionStream::new(
+                self.dbus_name(),
                 self.subscribe_property_change(PlaybackStatus).await?, 
                 self.get(PlaybackStatus).await?,
                 self.subscribe_property_change(Rate).await?,

@@ -7,10 +7,26 @@ use futures::Stream;
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use tokio::time::{Instant, Sleep, sleep_until};
-use zbus::{proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Type}};
+use zbus::{names::OwnedBusName, proxy::{PropertyStream, SignalStream}, zvariant::{OwnedValue, Type}};
 
 use crate::{Playback, player::Property, properties::{PlaybackStatus, Rate}, signals::{Seeked, Signal}};
 
+#[derive(Debug, Clone)]
+/// Contains the value yielded by a stream, and the [`Player`](super::Player)'s name that yielded it.
+/// 
+/// Useful when combining streams
+pub struct StreamYield<T> {
+    pub player_name: OwnedBusName,
+    pub value: T
+}
+impl<T> StreamYield<T> {
+    pub fn new(player_name: OwnedBusName, value: T) -> Self {
+        Self {
+            player_name,
+            value
+        }
+    }
+}
 
 /// Returns the current position of the media of a [`Player`](super::Player) every second, without polling the player.
 /// <br><br>Note: this doesn't take into account the length of the media, as it might not be provided, thus the returned position could be longer than the length of the media.
@@ -32,10 +48,13 @@ pub struct PositionStream<'a> {
     
     rate: f64,
     playback: Playback,
-    position: Duration
+    position: Duration,
+
+    player_name: OwnedBusName,
 }
 impl<'a> PositionStream<'a> {
     pub fn new(
+        player_name: OwnedBusName,
         playback_stream: ParsedPropertyStream<'a, PlaybackStatus>,
         initial_playback: Playback,
         rate_stream: ParsedPropertyStream<'a, Rate>,
@@ -51,12 +70,13 @@ impl<'a> PositionStream<'a> {
             last_tick: Instant::now(),
             rate: initial_rate, 
             playback: initial_playback, 
-            position: initial_position 
+            position: initial_position,
+            player_name
         }
     }
 }
 impl<'a> Stream for PositionStream<'a> {
-    type Item = Duration;
+    type Item = StreamYield<Duration>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         use Poll::*;
@@ -69,7 +89,7 @@ impl<'a> Stream for PositionStream<'a> {
             Ready(None) => return Ready(None),
             Ready(Some(new_rate)) => {
                 let old_rate = *this.rate;
-                *this.rate = new_rate;
+                *this.rate = new_rate.value;
 
                 if *this.playback == Playback::Playing {
                     // How much time passsed since the last tick
@@ -81,7 +101,7 @@ impl<'a> Stream for PositionStream<'a> {
                     *this.last_tick = Instant::now();
                     *this.position = new_position;
 
-                    return Ready(Some(new_position));
+                    return Ready(Some(StreamYield::new(this.player_name.clone(), new_position)));
                 }
             }
         }
@@ -94,21 +114,21 @@ impl<'a> Stream for PositionStream<'a> {
             Ready(None) => return Ready(None),
             Ready(Some(new_playback)) => {
                 let old_playback = *this.playback;
-                *this.playback = new_playback;
+                *this.playback = new_playback.value;
 
                 this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
 
                 match (old_playback, *this.playback) {
                     (Playback::Paused | Playback::Stopped, Playback::Playing) => {
                         *this.last_tick = Instant::now();
-                        return Ready(Some(*this.position))
+                        return Ready(Some(StreamYield::new(this.player_name.clone(), *this.position)))
                     },
                     (Playback::Playing, Playback::Paused | Playback::Stopped) => {
                         let delta = Instant::now() - *this.last_tick;
                         *this.position = Duration::from_micros(((*this.position + delta).as_micros() as f64 * *this.rate) as u64);
                         *this.last_tick = Instant::now();
 
-                        return Ready(Some(*this.position));
+                        return Ready(Some(StreamYield::new(this.player_name.clone(), *this.position)));
                     },
                     _ => {}
                 }
@@ -119,13 +139,13 @@ impl<'a> Stream for PositionStream<'a> {
             Pending => {},
             Ready(None) => return Ready(None),
             Ready(Some(new)) => {
-                *this.position = new;
+                *this.position = new.value;
                 *this.last_tick = Instant::now();
 
                 // Set next sleep cycle
                 this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
 
-                return Ready(Some(new))
+                return Ready(Some(StreamYield::new(this.player_name.clone(), new.value)))
             }
         }
 
@@ -147,7 +167,7 @@ impl<'a> Stream for PositionStream<'a> {
 
                 this.sleep.set(sleep_until(Instant::now() + Duration::from_secs(1)));
 
-                Ready(Some(*this.position))
+                Ready(Some(StreamYield::new(this.player_name.clone(), *this.position)))
             }
         }
     }
@@ -169,18 +189,20 @@ where
     #[pin]
     pending: Option<Pin<Box<dyn Future<Output = Result<P::ParseAs, zbus::Error>> + 'a >>>,
 
-    p: P
+    p: P,
+    player_name: OwnedBusName
 }
 impl<'a, P> ParsedPropertyStream<'a, P>
 where
     P: Property + Unpin + 'static,
     P::ParseAs: TryFrom<OwnedValue>
 {
-    pub fn new(property: P, prop_stream: PropertyStream<'a, P>) -> Self {
+    pub fn new(property: P, player_name: OwnedBusName, prop_stream: PropertyStream<'a, P>) -> Self {
         Self { 
             raw_stream: prop_stream, 
             pending: None, 
-            p: property
+            p: property,
+            player_name
         }
     }
 }
@@ -189,7 +211,7 @@ where
     P: Property + Unpin + 'static,
     P::ParseAs: TryFrom<OwnedValue>
 {
-    type Item = P::Output;
+    type Item = StreamYield<P::Output>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> 
     where 
@@ -207,7 +229,7 @@ where
                         let parsed: P::Output = this.p.into_output(result);
                         this.pending.set(None);
 
-                        return Ready(Some(parsed))
+                        return Ready(Some(StreamYield::new(this.player_name.clone(), parsed)))
                     },
                     Ready(Err(_e)) => {
                         this.pending.set(None);
@@ -251,17 +273,19 @@ where
     #[pin]
     raw_stream: SignalStream<'a>,
 
-    s: S
+    s: S,
+    player_name: OwnedBusName
 }
 impl<'a, S> ParsedSignalStream<'a, S>
 where
     S: Signal + 'static,
     S::ParseAs: DeserializeOwned + Send + 'static
 {
-    pub fn new(signal: S, signal_stream: SignalStream<'a>) -> Self {
+    pub fn new(signal: S, player_name: OwnedBusName, signal_stream: SignalStream<'a>) -> Self {
         Self { 
             raw_stream: signal_stream,
-            s: signal
+            s: signal,
+            player_name
         }
     }
 }
@@ -271,7 +295,7 @@ where
     S::Output: Send + 'static,
     S::ParseAs: DeserializeOwned + Send + 'static + Type
 {
-    type Item = S::Output;
+    type Item = StreamYield<S::Output>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         use Poll::*;
@@ -288,8 +312,8 @@ where
                     Err(_e) => return Ready(None)
                 };
 
-                Ready(Some(this.s.into_output(parsed)))
-                }
+                Ready(Some(StreamYield::new(this.player_name.clone(), this.s.into_output(parsed))))
+            }
         }
     }
 }
